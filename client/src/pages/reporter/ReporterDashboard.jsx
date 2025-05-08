@@ -40,74 +40,27 @@ const ReporterDashboard = () => {
           }
         };
         
-        // In a real application, you would fetch this data from your API
-        // const response = await axios.get('http://localhost:5000/api/news/reporter/mynews', config);
-        // setNews(response.data);
-        
-        // Placeholder data
-        setNews([
-          {
-            _id: '1',
-            title: 'New Technology Breakthrough in AI',
-            summary: 'Researchers have made a significant breakthrough in artificial intelligence that could revolutionize how machines learn.',
-            category: 'technology',
-            coverImage: 'https://via.placeholder.com/800x400?text=AI+Breakthrough',
-            isPublished: true,
-            publishedAt: new Date('2023-05-10'),
-            views: 1245,
-            createdAt: new Date('2023-05-08')
-          },
-          {
-            _id: '2',
-            title: 'Global Climate Summit Reaches New Agreement',
-            summary: 'World leaders have agreed on new measures to combat climate change at the latest global summit.',
-            category: 'politics',
-            coverImage: 'https://via.placeholder.com/800x400?text=Climate+Summit',
-            isPublished: true,
-            publishedAt: new Date('2023-04-25'),
-            views: 2389,
-            createdAt: new Date('2023-04-23')
-          },
-          {
-            _id: '3',
-            title: 'Stock Market Hits Record High',
-            summary: 'The stock market reached unprecedented levels today as tech stocks continue to surge.',
-            category: 'business',
-            coverImage: 'https://via.placeholder.com/800x400?text=Stock+Market',
-            isPublished: false,
-            createdAt: new Date('2023-05-15')
-          },
-          {
-            _id: '4',
-            title: 'New Health Study Reveals Benefits of Mediterranean Diet',
-            summary: 'A comprehensive study has shown significant health benefits for those following a Mediterranean diet.',
-            category: 'health',
-            coverImage: 'https://via.placeholder.com/800x400?text=Health+Study',
-            isPublished: false,
-            createdAt: new Date('2023-05-12')
-          }
-        ]);
-        
-        setLoading(false);
-      } catch (error) {
-        setError('Failed to fetch your news articles');
-        setLoading(false);
-      }
-    };
-
+        const response = await axios.get('http://localhost:5000/api/news/reporter/mynews', config);
+      setNews(response.data);
+      
+      setLoading(false);
+    } catch (error) {
+      setError('Failed to fetch your news articles');
+      setLoading(false);
+    }
+  };
     fetchReporterNews();
   }, [user]);
 
   const handleDeleteArticle = async () => {
     try {
-      // In a real application, you would send this to your API
-      // const config = {
-      //   headers: {
-      //     Authorization: `Bearer ${user.token}`
-      //   }
-      // };
-      // 
-      // await axios.delete(`http://localhost:5000/api/news/${selectedArticle._id}`, config);
+      const config = {
+        headers: {
+          Authorization: `Bearer ${user.token}`
+        }
+      };
+      
+      await axios.delete(`http://localhost:5000/api/news/${selectedArticle._id}`, config);
 
       // Update the local state
       setNews(news.filter(article => article._id !== selectedArticle._id));
@@ -289,8 +242,7 @@ const ReporterDashboard = () => {
                         <div className="flex space-x-2 mt-4 md:mt-0">
                           <Link 
                             to={`/news/${article._id}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
+                            
                             className="p-2 text-indigo-600 hover:text-indigo-900"
                           >
                             <FiEye size={20} />

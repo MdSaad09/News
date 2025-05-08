@@ -41,7 +41,8 @@ router.route('/reporter/stats').get(protect, reporter, getReporterStats);
 // Routes with path parameters - Must be AFTER all specific routes
 router.route('/:id').get(getNewsById);
 router.route('/:id').put(protect, reporter, updateNews);
-router.route('/:id').delete(protect, admin, deleteNews);
+// router.route('/:id').delete(protect, admin, deleteNews);
+router.route('/:id').delete(protect, reporter, deleteNews);
 router.route('/:id/publish').put(protect, admin, togglePublishNews);
 
 // POST route for creating news

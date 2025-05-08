@@ -108,6 +108,15 @@ const createNews = asyncHandler(async (req, res) => {
     // Check if user is admin
     const isAdmin = req.user.role === 'admin';
     
+    // Create a proper URL for the uploaded file
+    let coverImageUrl = coverImage;
+    if (req.file) {
+      // Extract the relative path from the full file path
+      const relativePath = req.file.path.split('uploads')[1];
+      // Create a URL that the frontend can access
+      coverImageUrl = `${req.protocol}://${req.get('host')}/uploads${relativePath}`;
+    }
+    
     // Create news with admin auto-publish
     const newsData = {
       title,
@@ -116,7 +125,7 @@ const createNews = asyncHandler(async (req, res) => {
       category,
       tags: tags || [],
       author: req.user._id,
-      coverImage: coverImage || (req.file ? req.file.path : null),
+      coverImage: coverImageUrl, // Use the URL instead of the file path
       media: [], // Initialize as empty array
       // Force publish for admin, otherwise use what was sent or default to false
       isPublished: isAdmin ? true : (isPublished || false),
@@ -317,6 +326,11 @@ const deleteNews = asyncHandler(async (req, res) => {
     if (!news) {
       res.status(404);
       throw new Error('News not found');
+    }
+
+    if (req.user.role !== 'admin' && news.author.toString() !== req.user._id.toString()) {
+      res.status(403);
+      throw new Error('Not authorized to delete this news article');
     }
     
     await news.deleteOne();

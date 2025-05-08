@@ -20,79 +20,78 @@ const ReporterStats = () => {
           }
         };
         
-        // In a real application, you would fetch this data from your API
-        // const response = await axios.get(`http://localhost:5000/api/news/reporter/stats?timeRange=${timeRange}`, config);
-        // setStats(response.data);
+        // Fetch real data from the API
+        const response = await axios.get(`http://localhost:5000/api/news/reporter/stats?timeRange=${timeRange}`, config);
         
-        // Placeholder data
-        // This would be replaced with actual API call in production
-        const placeholderStats = {
-          totalArticles: 12,
-          publishedArticles: 8,
-          pendingArticles: 4,
-          totalViews: 5280,
-          avgViewsPerArticle: 660,
-          mostViewedArticle: {
-            _id: '1',
-            title: 'New Technology Breakthrough in AI',
-            views: 1245,
-            publishedAt: new Date('2023-05-10')
-          },
-          categoryBreakdown: [
-            { category: 'technology', count: 5 },
-            { category: 'politics', count: 3 },
-            { category: 'business', count: 2 },
-            { category: 'health', count: 2 }
-          ],
-          monthlyArticles: [
-            { month: 'Jan', count: 1 },
-            { month: 'Feb', count: 2 },
-            { month: 'Mar', count: 1 },
-            { month: 'Apr', count: 3 },
-            { month: 'May', count: 5 },
-            { month: 'Jun', count: 0 },
-            { month: 'Jul', count: 0 },
-            { month: 'Aug', count: 0 },
-            { month: 'Sep', count: 0 },
-            { month: 'Oct', count: 0 },
-            { month: 'Nov', count: 0 },
-            { month: 'Dec', count: 0 }
-          ],
-          recentArticles: [
-            {
-              _id: '3',
-              title: 'Stock Market Hits Record High',
-              isPublished: false,
-              createdAt: new Date('2023-05-15'),
-              views: 0
-            },
-            {
-              _id: '4',
-              title: 'New Health Study Reveals Benefits of Mediterranean Diet',
-              isPublished: false,
-              createdAt: new Date('2023-05-12'),
-              views: 0
-            },
-            {
-              _id: '1',
-              title: 'New Technology Breakthrough in AI',
-              isPublished: true,
-              publishedAt: new Date('2023-05-10'),
-              views: 1245
-            }
-          ]
+        // Process the API response
+        const apiData = response.data;
+        
+        // Create a more complete stats object by combining API data with additional calculated fields
+        const enhancedStats = {
+          totalArticles: apiData.totalArticles || 0,
+          publishedArticles: apiData.publishedArticles || 0,
+          pendingArticles: apiData.pendingArticles || 0,
+          totalViews: apiData.totalViews || 0,
+          avgViewsPerArticle: apiData.totalArticles > 0 ? Math.round(apiData.totalViews / apiData.totalArticles) : 0,
+          mostViewedArticle: apiData.topArticles && apiData.topArticles.length > 0 ? apiData.topArticles[0] : null,
+          
+          // Generate category breakdown from top articles if available
+          categoryBreakdown: generateCategoryBreakdown(apiData.topArticles || []),
+          
+          // Generate monthly data (this would ideally come from the API)
+          monthlyArticles: generateMonthlyData(apiData.topArticles || []),
+          
+          // Use top articles as recent articles
+          recentArticles: apiData.topArticles || []
         };
         
-        setStats(placeholderStats);
+        setStats(enhancedStats);
         setLoading(false);
       } catch (error) {
-        setError('Failed to fetch statistics');
+        console.error('Error fetching stats:', error);
+        setError('Failed to fetch statistics. Please try again later.');
         setLoading(false);
       }
     };
 
     fetchStats();
   }, [user, timeRange]);
+  
+  // Helper function to generate category breakdown from articles
+  const generateCategoryBreakdown = (articles) => {
+    const categories = {};
+    
+    articles.forEach(article => {
+      if (article.category) {
+        if (categories[article.category]) {
+          categories[article.category]++;
+        } else {
+          categories[article.category] = 1;
+        }
+      }
+    });
+    
+    return Object.entries(categories).map(([category, count]) => ({
+      category,
+      count
+    }));
+  };
+  
+  // Helper function to generate monthly data
+  const generateMonthlyData = (articles) => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthCounts = months.map(month => ({ month, count: 0 }));
+    
+    articles.forEach(article => {
+      if (article.createdAt || article.publishedAt) {
+        const date = new Date(article.publishedAt || article.createdAt);
+        const monthIndex = date.getMonth();
+        monthCounts[monthIndex].count++;
+      }
+    });
+    
+    return monthCounts;
+  };
   
   const StatCard = ({ icon, title, value, bgColor }) => (
     <div className={`${bgColor} rounded-lg shadow-md p-6`}>
@@ -120,6 +119,15 @@ const ReporterStats = () => {
     return (
       <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4" role="alert">
         <span className="block sm:inline">{error}</span>
+      </div>
+    );
+  }
+  
+  // If no stats are available yet
+  if (!stats) {
+    return (
+      <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-4" role="alert">
+        <span className="block sm:inline">No statistics available yet. Start creating news articles to see your stats!</span>
       </div>
     );
   }
@@ -206,11 +214,11 @@ const ReporterStats = () => {
               <div className="flex items-center text-sm text-gray-500 mt-2">
                 <span className="flex items-center mr-4">
                   <FiEye className="mr-1" />
-                  {stats.mostViewedArticle.views} views
+                  {stats.mostViewedArticle.views || 0} views
                 </span>
                 <span className="flex items-center">
                   <FiCalendar className="mr-1" />
-                  Published: {new Date(stats.mostViewedArticle.publishedAt).toLocaleDateString()}
+                  Published: {new Date(stats.mostViewedArticle.publishedAt || stats.mostViewedArticle.createdAt).toLocaleDateString()}
                 </span>
               </div>
             </div>
@@ -226,22 +234,26 @@ const ReporterStats = () => {
             Category Breakdown
           </h3>
           
-          <div className="space-y-4">
-            {stats.categoryBreakdown.map((item) => (
-              <div key={item.category} className="relative">
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm font-medium text-gray-700 capitalize">{item.category}</span>
-                  <span className="text-sm font-medium text-gray-700">{item.count} articles</span>
+          {stats.categoryBreakdown && stats.categoryBreakdown.length > 0 ? (
+            <div className="space-y-4">
+              {stats.categoryBreakdown.map((item) => (
+                <div key={item.category} className="relative">
+                  <div className="flex justify-between mb-1">
+                    <span className="text-sm font-medium text-gray-700 capitalize">{item.category}</span>
+                    <span className="text-sm font-medium text-gray-700">{item.count} articles</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div 
+                      className="bg-blue-600 h-2.5 rounded-full" 
+                      style={{ width: `${(item.count / stats.totalArticles) * 100}%` }}
+                    ></div>
+                  </div>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2.5">
-                  <div 
-                    className="bg-blue-600 h-2.5 rounded-full" 
-                    style={{ width: `${(item.count / stats.totalArticles) * 100}%` }}
-                  ></div>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500">No category data available.</p>
+          )}
         </div>
       </div>
       
@@ -253,18 +265,21 @@ const ReporterStats = () => {
         </h3>
         
         <div className="h-64 flex items-end justify-between">
-          {stats.monthlyArticles.map((item) => (
-            <div key={item.month} className="flex flex-col items-center">
-              <div 
-                className="bg-blue-600 w-8 rounded-t-md" 
-                style={{ 
-                  height: `${item.count ? (item.count / Math.max(...stats.monthlyArticles.map(i => i.count)) * 180) : 0}px`,
-                  minHeight: item.count ? '20px' : '0'
-                }}
-              ></div>
-              <span className="text-xs mt-2">{item.month}</span>
-            </div>
-          ))}
+          {stats.monthlyArticles && stats.monthlyArticles.map((item) => {
+            const maxCount = Math.max(...stats.monthlyArticles.map(i => i.count));
+            return (
+              <div key={item.month} className="flex flex-col items-center">
+                <div 
+                  className="bg-blue-600 w-8 rounded-t-md" 
+                  style={{ 
+                    height: `${item.count && maxCount > 0 ? (item.count / maxCount * 180) : 0}px`,
+                    minHeight: item.count ? '20px' : '0'
+                  }}
+                ></div>
+                <span className="text-xs mt-2">{item.month}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
       
@@ -275,38 +290,42 @@ const ReporterStats = () => {
           Recent Articles
         </h3>
         
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Views</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {stats.recentArticles.map((article) => (
-                <tr key={article._id}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{article.title}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${article.isPublished ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                      {article.isPublished ? 'Published' : 'Draft'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(article.isPublished ? article.publishedAt : article.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {article.views}
-                  </td>
+        {stats.recentArticles && stats.recentArticles.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Views</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {stats.recentArticles.map((article) => (
+                  <tr key={article._id}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{article.title}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${article.isPublished ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                        {article.isPublished ? 'Published' : 'Draft'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(article.publishedAt || article.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {article.views || 0}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-gray-500">No articles available.</p>
+        )}
       </div>
     </div>
   );

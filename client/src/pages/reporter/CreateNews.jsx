@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-import { FiSave, FiImage, FiX, FiTag, FiPlus } from 'react-icons/fi';
+import { FiSave, FiImage, FiX, FiTag, FiPlus, FiLoader } from 'react-icons/fi';
 
 const CreateNews = () => {
   const navigate = useNavigate();
@@ -126,18 +126,34 @@ const CreateNews = () => {
     try {
       setSaving(true);
       
-      // In a real application, you would send this to your API
-      // const config = {
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //     Authorization: `Bearer ${user.token}`
-      //   }
-      // };
-      // 
-      // const response = await axios.post('http://localhost:5000/api/news', formData, config);
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Prepare form data for API
+      const formDataToSend = new FormData();
+    
+      // Append text fields
+      formDataToSend.append('title', formData.title);
+      formDataToSend.append('summary', formData.summary);
+      formDataToSend.append('content', formData.content);
+      formDataToSend.append('category', formData.category);
+
+      // Append tags as JSON string
+    if (formData.tags.length > 0) {
+      formDataToSend.append('tags', JSON.stringify(formData.tags));
+    }
+
+    // Get the actual file object from the coverImage input
+    const coverImageInput = document.getElementById('coverImage');
+    if (coverImageInput.files[0]) {
+      formDataToSend.append('coverImage', coverImageInput.files[0]);
+    }
+
+    const config = {
+      headers: {
+        
+        Authorization: `Bearer ${user.token}`
+      }
+    };
+    
+    const response = await axios.post('http://localhost:5000/api/news', formDataToSend, config);
       
       setSaving(false);
       toast.success('Article created successfully');
