@@ -15,7 +15,7 @@ const generateToken = (id) => {
 // @access  Public
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password, applyAsReporter, motivation } = req.body;
+    const { name, email, password, role, applyAsReporter, motivation } = req.body;
 
     // Check if user exists
     const userExists = await User.findOne({ email });
@@ -29,13 +29,14 @@ const registerUser = async (req, res) => {
       name,
       email,
       password,
+      role: role === 'reporter' ? 'reporter' : 'user',
     };
 
     // If applying as reporter, add application details
     if (applyAsReporter) {
       userData.bio = motivation;
       userData.reporterApplication = {
-        status: 'pending',
+        status: 'approved',
         appliedAt: Date.now()
       };
     }

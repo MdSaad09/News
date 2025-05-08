@@ -15,10 +15,17 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const { user, isLoading, error } = useSelector((state) => state.auth);
   
+
   useEffect(() => {
-    // If user is already logged in, redirect to home page
+    // If user is already logged in, redirect based on role
     if (user) {
-      navigate('/');
+      if (user.role === 'reporter') {
+        navigate('/reporter');
+      } else if (user.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
     }
     
     // Clear any previous errors
@@ -36,7 +43,15 @@ const LoginPage = () => {
       dispatch(loginStart());
       const userData = await authService.login({ email, password });
       dispatch(loginSuccess(userData));
-      navigate('/');
+      
+      // Redirect based on role
+      if (userData.role === 'reporter') {
+        navigate('/reporter');
+      } else if (userData.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
     } catch (error) {
       const message = error.response?.data?.message || 'Something went wrong';
       dispatch(loginFailure(message));

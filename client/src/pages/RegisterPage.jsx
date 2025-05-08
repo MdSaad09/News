@@ -10,20 +10,27 @@ const RegisterPage = () => {
     email: '',
     password: '',
     confirmPassword: '',
+    role: 'user',
     applyAsReporter: false,
     motivation: ''
   });
   
   const [passwordError, setPasswordError] = useState('');
-  const { name, email, password, confirmPassword, applyAsReporter, motivation } = formData;
+  const { name, email, password, confirmPassword, role, applyAsReporter, motivation } = formData;
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user, isLoading, error } = useSelector((state) => state.auth);
   
   useEffect(() => {
-    // If user is already logged in, redirect to home page
+    // If user is already logged in, redirect based on role
     if (user) {
-      navigate('/');
+      if (user.role === 'reporter') {
+        navigate('/reporter');
+      } else if (user.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
     }
     
     // Clear any previous errors
@@ -61,11 +68,20 @@ const RegisterPage = () => {
         name, 
         email, 
         password,
+        role,
         applyAsReporter,
         motivation: applyAsReporter ? motivation : ''
       });
       dispatch(registerSuccess(userData));
-      navigate('/');
+      
+      // Redirect based on role
+      if (userData.role === 'reporter') {
+        navigate('/reporter');
+      } else if (userData.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
     } catch (error) {
       const message = error.response?.data?.message || 'Something went wrong';
       dispatch(registerFailure(message));
@@ -151,31 +167,73 @@ const RegisterPage = () => {
             )}
           </div>
           
-          {/* Reporter Application Option */}
+          {/* Role Selection */}
           <div className="mb-4">
-            <div className="flex items-center">
-              <input
-                id="applyAsReporter"
-                type="checkbox"
-                name="applyAsReporter"
-                checked={applyAsReporter}
-                onChange={handleChange}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="applyAsReporter" className="ml-2 block text-sm text-gray-700">
-                Apply as a Reporter
-              </label>
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="role">
+              Account Type
+            </label>
+            <div className="flex space-x-4">
+              <div className="flex items-center">
+                <input
+                  id="roleUser"
+                  type="radio"
+                  name="role"
+                  value="user"
+                  checked={role === 'user'}
+                  onChange={handleChange}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                />
+                <label htmlFor="roleUser" className="ml-2 block text-sm text-gray-700">
+                  Regular User
+                </label>
+              </div>
+              <div className="flex items-center">
+                <input
+                  id="roleReporter"
+                  type="radio"
+                  name="role"
+                  value="reporter"
+                  checked={role === 'reporter'}
+                  onChange={handleChange}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                />
+                <label htmlFor="roleReporter" className="ml-2 block text-sm text-gray-700">
+                  Reporter
+                </label>
+              </div>
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Reporters can submit news articles for publication after admin approval.
+              Reporters can submit news articles after registration.
             </p>
           </div>
           
-          {/* Motivation Field (only shown if applying as reporter) */}
-          {applyAsReporter && (
+          {/* Reporter Application Option (only shown if role is not reporter) */}
+          {role === 'user' && (
+            <div className="mb-4">
+              <div className="flex items-center">
+                <input
+                  id="applyAsReporter"
+                  type="checkbox"
+                  name="applyAsReporter"
+                  checked={applyAsReporter}
+                  onChange={handleChange}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="applyAsReporter" className="ml-2 block text-sm text-gray-700">
+                  Apply as a Reporter
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Apply to become a reporter. You'll be able to submit news articles after registration.
+              </p>
+            </div>
+          )}
+          
+          {/* Motivation Field (only shown if applying as reporter or role is reporter) */}
+          {(applyAsReporter || role === 'reporter') && (
             <div className="mb-6">
               <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="motivation">
-                Why do you want to be a reporter? (min. 50 characters)
+                {role === 'reporter' ? 'Tell us about yourself as a reporter' : 'Why do you want to be a reporter?'} (min. 50 characters)
               </label>
               <textarea
                 className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -185,7 +243,7 @@ const RegisterPage = () => {
                 placeholder="Describe your experience, interests, and why you want to join our team..."
                 value={motivation}
                 onChange={handleChange}
-                required={applyAsReporter}
+                required={applyAsReporter || role === 'reporter'}
               ></textarea>
               <p className="text-xs text-gray-500 mt-1">
                 {motivation.length}/50 characters (minimum required)
