@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const { User } = require('../models');
 
 // Generate JWT
 const generateToken = (id) => {
@@ -7,8 +7,6 @@ const generateToken = (id) => {
     expiresIn: '30d',
   });
 };
-
-
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
@@ -18,7 +16,7 @@ const registerUser = async (req, res) => {
     const { name, email, password, role, applyAsReporter, motivation } = req.body;
 
     // Check if user exists
-    const userExists = await User.findOne({ email });
+    const userExists = await User.findOne({ where: { email } });
 
     if (userExists) {
       return res.status(400).json({ message: 'User already exists' });
@@ -35,22 +33,20 @@ const registerUser = async (req, res) => {
     // If applying as reporter, add application details
     if (applyAsReporter) {
       userData.bio = motivation;
-      userData.reporterApplication = {
-        status: 'approved',
-        appliedAt: Date.now()
-      };
+      userData.reporterApplicationStatus = 'approved';
+      userData.reporterApplicationDate = new Date();
     }
 
     const user = await User.create(userData);
 
     if (user) {
       res.status(201).json({
-        _id: user._id,
+        _id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
-        reporterApplication: user.reporterApplication,
-        token: generateToken(user._id),
+        reporterApplicationStatus: user.reporterApplicationStatus,
+        token: generateToken(user.id),
       });
     } else {
       res.status(400).json({ message: 'Invalid user data' });
@@ -69,7 +65,7 @@ const loginUser = async (req, res) => {
     const { email, password } = req.body;
 
     // Check for user email
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ where: { email } });
 
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -83,12 +79,12 @@ const loginUser = async (req, res) => {
     }
 
     res.json({
-      _id: user._id,
+      _id: user.id,
       name: user.name,
       email: user.email,
       role: user.role,
       profilePicture: user.profilePicture,
-      token: generateToken(user._id),
+      token: generateToken(user.id),
     });
   } catch (error) {
     console.error(error);
@@ -101,11 +97,11 @@ const loginUser = async (req, res) => {
 // @access  Private
 const getUserProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findByPk(req.user.id);
 
     if (user) {
       res.json({
-        _id: user._id,
+        _id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
@@ -125,7 +121,7 @@ const getUserProfile = async (req, res) => {
 // @access  Private
 const updateUserProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findByPk(req.user.id);
 
     if (user) {
       user.name = req.body.name || user.name;
@@ -139,12 +135,12 @@ const updateUserProfile = async (req, res) => {
       const updatedUser = await user.save();
 
       res.json({
-        _id: updatedUser._id,
+        _id: updatedUser.id,
         name: updatedUser.name,
         email: updatedUser.email,
         role: updatedUser.role,
         profilePicture: updatedUser.profilePicture,
-        token: generateToken(updatedUser._id),
+        token: generateToken(updatedUser.id),
       });
     } else {
       res.status(404).json({ message: 'User not found' });
@@ -155,13 +151,12 @@ const updateUserProfile = async (req, res) => {
   }
 };
 
-
 // @desc    Apply for reporter role
 // @route   POST /api/auth/apply-reporter
 // @access  Private (only regular users)
 const applyForReporter = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findByPk(req.user.id);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -175,7 +170,7 @@ const applyForReporter = async (req, res) => {
     }
 
     // Check if there's a pending application
-    if (user.reporterApplication.status === 'pending') {
+    if (user.reporterApplicationStatus === 'pending') {
       return res.status(400).json({ 
         message: 'You already have a pending application'
       });
@@ -191,16 +186,16 @@ const applyForReporter = async (req, res) => {
     }
 
     // Update user with application details
-    user.reporterApplication.status = 'pending';
-    user.reporterApplication.appliedAt = Date.now();
+    user.reporterApplicationStatus = 'pending';
+    user.reporterApplicationDate = new Date();
     user.bio = motivation; // Save motivation as bio
 
     await user.save();
 
     res.status(200).json({
       message: 'Application submitted successfully',
-      applicationStatus: user.reporterApplication.status,
-      appliedAt: user.reporterApplication.appliedAt
+      applicationStatus: user.reporterApplicationStatus,
+      appliedAt: user.reporterApplicationDate
     });
   } catch (error) {
     console.error(error);

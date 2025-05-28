@@ -1,42 +1,45 @@
-const mongoose = require('mongoose');
+module.exports = (sequelize, DataTypes) => {
+  const Category = sequelize.define('Category', {
+    name: {
+      type: DataTypes.STRING(50),
+      allowNull: false,
+      validate: {
+        notEmpty: true,
+        len: [1, 50]
+      }
+    },
+    slug: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      validate: {
+        notEmpty: true
+      }
+    },
+    description: {
+      type: DataTypes.STRING(200),
+      validate: {
+        len: [0, 200]
+      }
+    }
+  }, {
+    timestamps: true,
+    indexes: [
+      {
+        unique: true,
+        fields: ['name']
+      },
+      {
+        unique: true,
+        fields: ['slug']
+      }
+    ]
+  });
 
-const categorySchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: [true, 'Please add a category name'],
-    trim: true,
-    unique: true,
-    maxlength: [50, 'Category name cannot be more than 50 characters']
-  },
-  slug: {
-    type: String,
-    required: true,
-    unique: true,
-    lowercase: true,
-    trim: true
-  },
-  description: {
-    type: String,
-    trim: true,
-    maxlength: [200, 'Description cannot be more than 200 characters']
-  },
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  }
-}, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
-});
+  // Updated method to get article count using the relation
+  Category.prototype.getArticleCount = async function() {
+    const { News } = require('./index');
+    return await News.count({ where: { categoryId: this.id } });
+  };
 
-// Virtual for article count
-categorySchema.virtual('articleCount', {
-  ref: 'News',
-  localField: 'slug',
-  foreignField: 'category',
-  count: true
-});
-
-module.exports = mongoose.model('Category', categorySchema);
+  return Category;
+};

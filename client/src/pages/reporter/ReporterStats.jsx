@@ -303,7 +303,7 @@ const ReporterStats = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {stats.recentArticles.map((article) => (
-                  <tr key={article._id}>
+                  <tr key={article.id}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{article.title}</div>
                     </td>

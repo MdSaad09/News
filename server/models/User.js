@@ -1,89 +1,91 @@
-const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const userSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: [true, 'Please add a name']
-  },
-  email: {
-    type: String,
-    required: [true, 'Please add an email'],
-    unique: true,
-    match: [
-      /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
-      'Please add a valid email'
-    ]
-  },
-  password: {
-    type: String,
-    required: [true, 'Please add a password'],
-    minlength: 6,
-    select: false
-  },
-  role: {
-    type: String,
-    enum: ['user', 'reporter', 'admin'],
-    default: 'user'
-  },
-  profilePicture: {
-    type: String,
-    default: ''
-  },
-  bio: {
-    type: String,
-    default: ''
-  },
-  // Reporter application fields
-  reporterApplication: {
-    status: {
-      type: String,
-      enum: ['none', 'pending', 'approved', 'rejected'],
-      default: 'none'
+module.exports = (sequelize, DataTypes) => {
+  const User = sequelize.define('User', {
+    name: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      validate: {
+        notEmpty: true
+      }
     },
-    appliedAt: {
-      type: Date
+    email: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      validate: {
+        isEmail: true
+      }
     },
-    feedback: {
-      type: String,
-      default: ''
-    }
-  },
-  // Reporter statistics
-  reporterStats: {
+    password: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      validate: {
+        len: [6, 100]
+      }
+    },
+    role: {
+      type: DataTypes.ENUM('user', 'reporter', 'admin'),
+      defaultValue: 'user'
+    },
+    profilePicture: {
+      type: DataTypes.STRING,
+      defaultValue: ''
+    },
+    bio: {
+      type: DataTypes.TEXT,
+      defaultValue: ''
+    },
+    reporterApplicationStatus: {
+      type: DataTypes.ENUM('none', 'pending', 'approved', 'rejected'),
+      defaultValue: 'none'
+    },
+    reporterApplicationDate: {
+      type: DataTypes.DATE
+    },
+    reporterApplicationFeedback: {
+      type: DataTypes.TEXT,
+      defaultValue: ''
+    },
     articlesPublished: {
-      type: Number,
-      default: 0
+      type: DataTypes.INTEGER,
+      defaultValue: 0
     },
     articlesRejected: {
-      type: Number,
-      default: 0
+      type: DataTypes.INTEGER,
+      defaultValue: 0
     },
     lastArticleDate: {
-      type: Date
+      type: DataTypes.DATE
     }
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-}, {
-  timestamps: true
-});
+  }, {
+    timestamps: true,
+    indexes: [
+      {
+        unique: true,
+        fields: ['email']
+      }
+    ]
+  });
 
-// Encrypt password using bcrypt
-userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) {
-    next();
-  }
+  // Instance method to check password
+  User.prototype.matchPassword = async function(enteredPassword) {
+    return await bcrypt.compare(enteredPassword, this.password);
+  };
 
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-});
+  // Hook to hash password before save
+  User.beforeCreate(async (user) => {
+    if (user.password) {
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(user.password, salt);
+    }
+  });
 
-// Match user entered password to hashed password in database
-userSchema.methods.matchPassword = async function(enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+  User.beforeUpdate(async (user) => {
+    if (user.changed('password')) {
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(user.password, salt);
+    }
+  });
+
+  return User;
 };
-
-module.exports = mongoose.model('User', userSchema);

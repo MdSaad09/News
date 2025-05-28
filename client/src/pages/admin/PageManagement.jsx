@@ -32,8 +32,8 @@ const PageManagement = () => {
 
   const handleDeletePage = async () => {
     try {
-      await pageService.deletePage(selectedPage._id);
-      setPages(pages.filter(p => p._id !== selectedPage._id));
+      await pageService.deletePage(selectedPage.id);
+      setPages(pages.filter(p => p.id !== selectedPage.id));
       setShowDeleteModal(false);
       setSelectedPage(null);
       
@@ -109,7 +109,7 @@ const PageManagement = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredPages.map((page) => (
-                <tr key={page._id} className="hover:bg-gray-50">
+                <tr key={page.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">{page.title}</div>
                   </td>
@@ -135,7 +135,7 @@ const PageManagement = () => {
                         <FiEye />
                       </a>
                       <Link 
-                        to={`/admin/pages/edit/${page._id}`}
+                        to={`/admin/pages/edit/${page.id}`}
                         className="text-blue-600 hover:text-blue-900"
                       >
                         <FiEdit />

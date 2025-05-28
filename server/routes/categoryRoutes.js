@@ -4,7 +4,8 @@ const {
   getCategoryById,
   createCategory,
   updateCategory,
-  deleteCategory
+  deleteCategory,
+  setupDefaultCategories
 } = require('../controllers/categoryController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
@@ -14,9 +15,13 @@ router.route('/')
   .get(getCategories)
   .post(protect, admin, createCategory);
 
+
+  router.post('/setup', protect, admin, setupDefaultCategories);
 router.route('/:id')
   .get(getCategoryById)
   .put(protect, admin, updateCategory)
   .delete(protect, admin, deleteCategory);
+
+
 
 module.exports = router;

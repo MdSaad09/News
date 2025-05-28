@@ -6,8 +6,22 @@ const getAdminStats = async () => {
   return response.data;
 };
 
+// Get all news articles (published and unpublished)
+const getAllNews = async (params = {}) => {
+  const response = await api.get('/news/admin', { params });
+  return response.data;
+};
+
+// Toggle publish status of a news article
+const togglePublishNews = async (id) => {
+  const response = await api.put(`/news/${id}/publish`);
+  return response.data;
+};
+
 const adminService = {
-  getAdminStats
+  getAdminStats,
+  getAllNews,
+  togglePublishNews
 };
 
 export default adminService;

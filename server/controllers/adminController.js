@@ -1,5 +1,5 @@
-const User = require('../models/User');
-const News = require('../models/News');
+const { User, News } = require('../models');
+const { Op } = require('sequelize');
 
 // @desc    Get admin dashboard statistics
 // @route   GET /api/admin/stats
@@ -7,28 +7,30 @@ const News = require('../models/News');
 const getAdminStats = async (req, res) => {
   try {
     // Get total users count
-    const totalUsers = await User.countDocuments({ role: 'user' });
+    const totalUsers = await User.count({ where: { role: 'user' } });
     
     // Get total reporters count
-    const totalReporters = await User.countDocuments({ role: 'reporter' });
+    const totalReporters = await User.count({ where: { role: 'reporter' } });
     
     // Get total articles count
-    const totalArticles = await News.countDocuments();
+    const totalArticles = await News.count();
     
     // Get pending articles count
-    const pendingArticles = await News.countDocuments({ isPublished: false });
+    const pendingArticles = await News.count({ where: { isPublished: false } });
     
     // Get pending reporter applications
-    const pendingApplications = await User.countDocuments({
-      'reporterApplication.status': 'pending'
+    const pendingApplications = await User.count({
+      where: { reporterApplicationStatus: 'pending' }
     });
     
     // Get recent views (sum of views from all articles in the last 7 days)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     
-    const recentArticles = await News.find({
-      updatedAt: { $gte: sevenDaysAgo }
+    const recentArticles = await News.findAll({
+      where: {
+        updatedAt: { [Op.gte]: sevenDaysAgo }
+      }
     });
     
     const recentViews = recentArticles.reduce((total, article) => {
@@ -60,32 +62,52 @@ const getRecentActivity = async () => {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     
-    const recentArticles = await News.find({
-      createdAt: { $gte: sevenDaysAgo }
-    }).sort({ createdAt: -1 }).limit(5).populate('author', 'name');
+    const recentArticles = await News.findAll({
+      where: {
+        createdAt: { [Op.gte]: sevenDaysAgo }
+      },
+      order: [['createdAt', 'DESC']],
+      limit: 5,
+      include: [{
+        model: User,
+        as: 'author',
+        attributes: ['name']
+      }]
+    });
     
     // Get recent reporter applications
-    const recentApplications = await User.find({
-      'reporterApplication.appliedAt': { $gte: sevenDaysAgo }
-    }).sort({ 'reporterApplication.appliedAt': -1 }).limit(5).select('name reporterApplication.appliedAt');
+    const recentApplications = await User.findAll({
+      where: {
+        reporterApplicationDate: { [Op.gte]: sevenDaysAgo },
+        reporterApplicationStatus: { [Op.ne]: 'none' }  // Add this to filter out users with no application
+      },
+      order: [['reporterApplicationDate', 'DESC']],
+      limit: 5,
+      attributes: ['name', 'reporterApplicationDate']
+    });
     
     // Get recent user registrations
-    const recentUsers = await User.find({
-      createdAt: { $gte: sevenDaysAgo }
-    }).sort({ createdAt: -1 }).limit(5).select('name createdAt');
+    const recentUsers = await User.findAll({
+      where: {
+        createdAt: { [Op.gte]: sevenDaysAgo }
+      },
+      order: [['createdAt', 'DESC']],
+      limit: 5,
+      attributes: ['name', 'createdAt']
+    });
     
     // Combine and sort all activities by date
     const activities = [
       ...recentArticles.map(article => ({
         type: 'article',
-        user: article.author.name,
+        user: article.author ? article.author.name : 'Unknown', // Add null check
         timestamp: article.createdAt,
         title: article.title
       })),
       ...recentApplications.map(user => ({
         type: 'application',
         user: user.name,
-        timestamp: user.reporterApplication.appliedAt
+        timestamp: user.reporterApplicationDate
       })),
       ...recentUsers.map(user => ({
         type: 'registration',
@@ -95,7 +117,7 @@ const getRecentActivity = async () => {
     ];
     
     // Sort by timestamp (newest first)
-    activities.sort((a, b) => b.timestamp - a.timestamp);
+    activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)); // Updated to handle Date objects properly
     
     // Return the 5 most recent activities
     return activities.slice(0, 5);

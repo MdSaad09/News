@@ -5,7 +5,7 @@ const {
   updateUser,
   deleteUser,
   getReporterApplications,
-  reviewReporterApplication
+  updateReporterStatus
 } = require('../controllers/userController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
@@ -25,6 +25,6 @@ router.route('/reporter-applications')
   .get(protect, admin, getReporterApplications);
 
 router.route('/reporter-applications/:userId')
-  .put(protect, admin, reviewReporterApplication);
+  .put(protect, admin, updateReporterStatus);
 
 module.exports = router;

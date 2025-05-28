@@ -1,27 +1,44 @@
-const mongoose = require('mongoose');
+module.exports = (sequelize, DataTypes) => {
+  const Comment = sequelize.define('Comment', {
+    text: {
+      type: DataTypes.TEXT,
+      allowNull: false,
+      validate: {
+        notEmpty: true
+      }
+    },
+    isApproved: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true
+    },
+    // Add these foreign key fields
+    newsId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'News',
+        key: 'id'
+      }
+    },
+    userId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'Users',
+        key: 'id'
+      }
+    }
+  }, {
+    timestamps: true,
+    indexes: [
+      {
+        fields: ['newsId']
+      },
+      {
+        fields: ['userId']
+      }
+    ]
+  });
 
-const commentSchema = new mongoose.Schema({
-  news: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'News',
-    required: true
-  },
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  text: {
-    type: String,
-    required: [true, 'Please add a comment'],
-    trim: true
-  },
-  isApproved: {
-    type: Boolean,
-    default: true
-  }
-}, {
-  timestamps: true
-});
-
-module.exports = mongoose.model('Comment', commentSchema);
+  return Comment;
+};

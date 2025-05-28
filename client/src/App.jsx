@@ -1,3 +1,4 @@
+// Updated App.jsx with new routes
 import { Routes, Route } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -13,6 +14,10 @@ import RegisterPage from './pages/RegisterPage';
 import ProfilePage from './pages/ProfilePage';
 import NewsDetailPage from './pages/NewsDetailPage';
 import NotFoundPage from './pages/NotFoundPage';
+// New page imports
+import VideoNewsPage from './pages/VideoNewsPage';
+import PeopleListPage from './pages/PeopleListPage';
+import PersonNewsPage from './pages/PersonNewsPage';
 
 // Admin pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -24,6 +29,9 @@ import CategoryManagement from './pages/admin/CategoryManagement';
 import PageManagement from './pages/admin/PageManagement';
 import UserManagement from './pages/admin/UserManagement';
 import SiteSettings from './pages/admin/SiteSettings';
+// New admin pages
+import PeopleManagement from './pages/admin/PeopleManagement';
+import PersonEditor from './pages/admin/PersonEditor';
 
 // Reporter pages
 import ReporterDashboard from './pages/reporter/ReporterDashboard';
@@ -43,6 +51,10 @@ function App() {
           <Route path="login" element={<LoginPage />} />
           <Route path="register" element={<RegisterPage />} />
           <Route path="news/:id" element={<NewsDetailPage />} />
+          {/* New public routes */}
+          <Route path="videos" element={<VideoNewsPage />} />
+          <Route path="people" element={<PeopleListPage />} />
+          <Route path="people/:slug" element={<PersonNewsPage />} />
           
           {/* Protected routes */}
           <Route element={<ProtectedRoute />}>
@@ -50,8 +62,7 @@ function App() {
           </Route>
           
           {/* Admin routes */}
-            {/* Admin routes - Better nesting structure */}
-            <Route path="admin" element={<AdminRoute />}>
+          <Route path="admin" element={<AdminRoute />}>
             <Route index element={<AdminDashboard />} />
             <Route path="reporter-applications" element={<ReporterApplications />} />
             <Route path="news" element={<NewsManagement />} />
@@ -62,6 +73,10 @@ function App() {
             <Route path="settings" element={<SiteSettings />} />
             <Route path="news/create" element={<NewsEditor />} />
             <Route path="news/edit/:id" element={<NewsEditor />} />
+            {/* New admin routes */}
+            <Route path="people" element={<PeopleManagement />} />
+            <Route path="people/create" element={<PersonEditor />} />
+            <Route path="people/edit/:id" element={<PersonEditor />} />
           </Route>
           
           {/* Reporter routes */}

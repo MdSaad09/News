@@ -33,15 +33,15 @@ const UserManagement = () => {
   const handleDeleteUser = async () => {
     try {
       // Don't allow deleting yourself if you're an admin
-      if (selectedUser._id === currentUser._id) {
+      if (selectedUser.id === currentUser.id) {
         toast.error('You cannot delete your own account');
         return;
       }
 
-      await userService.deleteUser(selectedUser._id);
+      await userService.deleteUser(selectedUser.id);
 
       // Update the local state
-      setUsers(users.filter(u => u._id !== selectedUser._id));
+      setUsers(users.filter(u => u.id !== selectedUser.id));
       setShowDeleteModal(false);
       setSelectedUser(null);
       
@@ -129,7 +129,7 @@ const UserManagement = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredUsers.map((user) => (
-                <tr key={user._id} className="hover:bg-gray-50">
+                <tr key={user.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">{user.name}</div>
                   </td>
@@ -147,7 +147,7 @@ const UserManagement = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end space-x-2">
                       <Link 
-                        to={`/admin/users/edit/${user._id}`}
+                        to={`/admin/users/edit/${user.id}`}
                         className="text-blue-600 hover:text-blue-900"
                       >
                         <FiEdit />
@@ -158,7 +158,7 @@ const UserManagement = () => {
                           setShowDeleteModal(true);
                         }}
                         className="text-red-600 hover:text-red-900"
-                        disabled={user.role === 'admin' && user._id === currentUser._id}
+                        disabled={user.role === 'admin' && user.id === currentUser.id}
                       >
                         <FiTrash2 />
                       </button>

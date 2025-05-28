@@ -35,10 +35,10 @@ const ReporterApplications = () => {
     }
 
     try {
-      await userService.reviewReporterApplication(selectedApplication._id, status, feedback);
+      await userService.reviewReporterApplication(selectedApplication.id, status, feedback);
 
       // Update the local state
-      setApplications(applications.filter(app => app._id !== selectedApplication._id));
+      setApplications(applications.filter(app => app.id !== selectedApplication.id));
       setSelectedApplication(null);
       setFeedback('');
       
@@ -75,7 +75,7 @@ const ReporterApplications = () => {
       ) : (
         <div className="grid grid-cols-1 gap-6">
           {applications.map((application) => (
-            <div key={application._id} className="bg-white p-6 rounded-lg shadow-md">
+            <div key={application.id} className="bg-white p-6 rounded-lg shadow-md">
               <div className="flex flex-col md:flex-row md:justify-between md:items-start">
                 <div>
                   <h3 className="text-xl font-semibold">{application.name}</h3>

@@ -1,72 +1,55 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { FiUsers, FiFileText, FiUserCheck, FiAlertTriangle, FiEye, FiTag } from 'react-icons/fi';
+import { 
+  FiUsers, FiFileText, FiUserCheck, FiAlertTriangle, 
+  FiEye, FiTag, FiRefreshCw, FiActivity, FiTrendingUp , FiUser, FiVideo
+} from 'react-icons/fi';
 import adminService from '../../services/adminService';
 
-const AdminHome = () => {
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    totalReporters: 0,
-    totalArticles: 0,
-    pendingArticles: 0,
-    pendingApplications: 0,
-    recentViews: 0,
-    recentActivity: []
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const { user } = useSelector((state) => state.auth);
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        const data = await adminService.getAdminStats();
-        setStats(data);
-        setLoading(false);
-      } catch (error) {
-        setError('Failed to fetch statistics: ' + (error.response?.data?.message || error.message));
-        setLoading(false);
-      }
-    };
-
-    fetchStats();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4" role="alert">
-        <span className="block sm:inline">{error}</span>
-      </div>
-    );
-  }
-
-  const StatCard = ({ icon, title, value, bgColor, textColor, linkTo }) => (
-    <Link to={linkTo} className="block">
-      <div className={`${bgColor} rounded-lg shadow-md p-6 transition-transform hover:scale-105`}>
-        <div className="flex items-center">
-          <div className={`p-3 rounded-full ${textColor} bg-white bg-opacity-30 mr-4`}>
-            {icon}
-          </div>
-          <div>
-            <p className="text-white text-sm">{title}</p>
+// Extracted StatCard component for reusability
+const StatCard = ({ icon, title, value, bgColor, textColor, linkTo, trend }) => (
+  <Link 
+    to={linkTo} 
+    className="block rounded-lg shadow-md overflow-hidden transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+    aria-label={`View ${title.toLowerCase()}: ${value}`}
+  >
+    <div className={`${bgColor} p-6`}>
+      <div className="flex items-center">
+        <div className={`p-3 rounded-full ${textColor} bg-white bg-opacity-30 mr-4`} aria-hidden="true">
+          {icon}
+        </div>
+        <div>
+          <p className="text-white text-sm">{title}</p>
+          <div className="flex items-center">
             <h3 className="text-white text-2xl font-bold">{value}</h3>
+            {trend && (
+              <span className={`ml-2 flex items-center text-sm ${trend > 0 ? 'text-green-300' : 'text-red-300'}`}>
+                <FiTrendingUp className={`${trend < 0 && 'transform rotate-180'} mr-1`} />
+                {Math.abs(trend)}%
+              </span>
+            )}
           </div>
         </div>
       </div>
-    </Link>
-  );
+    </div>
+  </Link>
+);
 
-  // Format timestamp to relative time (e.g., "2 hours ago")
+// Activity item component
+const ActivityItem = ({ activity }) => {
+  // Get border color based on activity type
+  const getBorderColor = (type) => {
+    switch (type) {
+      case 'article': return 'border-blue-500';
+      case 'application': return 'green-500';
+      case 'registration': return 'border-orange-500';
+      default: return 'border-gray-500';
+    }
+  };
+
+  // Format timestamp to relative time
   const formatRelativeTime = (timestamp) => {
     const now = new Date();
     const date = new Date(timestamp);
@@ -86,22 +69,8 @@ const AdminHome = () => {
     return date.toLocaleDateString();
   };
 
-  // Get border color based on activity type
-  const getActivityBorderColor = (type) => {
-    switch (type) {
-      case 'article':
-        return 'border-blue-500';
-      case 'application':
-        return 'border-green-500';
-      case 'registration':
-        return 'border-orange-500';
-      default:
-        return 'border-gray-500';
-    }
-  };
-
   // Get activity message based on type
-  const getActivityMessage = (activity) => {
+  const getMessage = () => {
     switch (activity.type) {
       case 'article':
         return (
@@ -127,8 +96,122 @@ const AdminHome = () => {
   };
 
   return (
+    <div className={`border-l-4 ${getBorderColor(activity.type)} pl-4 py-2 hover:bg-gray-50 rounded-r`}>
+      <div className="flex justify-between items-start">
+        <div>
+          <p className="text-sm text-gray-600">{formatRelativeTime(activity.timestamp)}</p>
+          {getMessage()}
+        </div>
+        {activity.type === 'article' && (
+          <Link 
+            to={`/admin/news/edit/${activity.id}`}
+            className="text-blue-600 hover:text-blue-800 text-sm ml-2"
+          >
+            View
+          </Link>
+        )}
+        {activity.type === 'application' && (
+          <Link 
+            to={`/admin/applications/${activity.id}`}
+            className="text-blue-600 hover:text-blue-800 text-sm ml-2"
+          >
+            Review
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const AdminHome = () => {
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    totalReporters: 0,
+    totalArticles: 0,
+    pendingArticles: 0,
+    pendingApplications: 0,
+    recentViews: 0,
+    recentActivity: [],
+    trends: {
+      users: 0,
+      articles: 5,
+      views: 12
+    }
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const { user } = useSelector((state) => state.auth);
+
+  const fetchStats = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await adminService.getAdminStats();
+      setStats(data);
+    } catch (error) {
+      setError('Failed to fetch statistics: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+    
+    // Set up polling every 5 minutes
+    const interval = setInterval(() => {
+      fetchStats();
+    }, 5 * 60 * 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchStats();
+  };
+
+  if (loading && !refreshing) {
+    return (
+      <div className="flex justify-center items-center h-64" aria-live="polite">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600" role="status">
+          <span className="sr-only">Loading dashboard stats...</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
     <div>
-      <h2 className="text-2xl font-bold mb-6">Dashboard Overview</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">Dashboard Overview</h2>
+        <button 
+          onClick={handleRefresh} 
+          className={`flex items-center text-blue-600 hover:text-blue-800 focus:outline-none focus:underline ${refreshing ? 'opacity-50 cursor-not-allowed' : ''}`}
+          disabled={refreshing}
+          aria-label="Refresh dashboard data"
+        >
+          <FiRefreshCw className={`mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
+      
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6" role="alert" aria-live="assertive">
+          <div className="flex items-center">
+            <FiAlertTriangle className="mr-2" aria-hidden="true" />
+            <span>{error}</span>
+          </div>
+          <button 
+            onClick={handleRefresh}
+            className="mt-2 text-sm text-red-700 hover:text-red-800 font-medium focus:outline-none focus:underline"
+          >
+            Try Again
+          </button>
+        </div>
+      )}
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <StatCard 
@@ -138,6 +221,7 @@ const AdminHome = () => {
           bgColor="bg-blue-600"
           textColor="text-blue-600"
           linkTo="/admin/users"
+          trend={stats.trends?.users}
         />
         
         <StatCard 
@@ -156,14 +240,15 @@ const AdminHome = () => {
           bgColor="bg-purple-600"
           textColor="text-purple-600"
           linkTo="/admin/news"
+          trend={stats.trends?.articles}
         />
         
         <StatCard 
           icon={<FiFileText size={24} />}
           title="Pending Articles"
           value={stats.pendingArticles}
-          bgColor="bg-yellow-600"
-          textColor="text-yellow-600"
+          bgColor={stats.pendingArticles > 10 ? "bg-red-600" : "bg-yellow-600"}
+          textColor={stats.pendingArticles > 10 ? "text-red-600" : "text-yellow-600"}
           linkTo="/admin/news?status=pending"
         />
         
@@ -171,8 +256,8 @@ const AdminHome = () => {
           icon={<FiAlertTriangle size={24} />}
           title="Pending Applications"
           value={stats.pendingApplications}
-          bgColor="bg-orange-600"
-          textColor="text-orange-600"
+          bgColor={stats.pendingApplications > 5 ? "bg-orange-600" : "bg-orange-500"}
+          textColor={stats.pendingApplications > 5 ? "text-orange-600" : "text-orange-500"}
           linkTo="/admin/applications"
         />
         
@@ -183,51 +268,155 @@ const AdminHome = () => {
           bgColor="bg-indigo-600"
           textColor="text-indigo-600"
           linkTo="/admin/analytics"
+          trend={stats.trends?.views}
         />
+
+<StatCard 
+  icon={<FiUser size={24} />}
+  title="Featured People"
+  value={stats.totalPeople || 0}
+  bgColor="bg-teal-600"
+  textColor="text-teal-600"
+  linkTo="/admin/people"
+/>
+
+<StatCard 
+  icon={<FiVideo size={24} />}
+  title="Video News"
+  value={stats.videoNews || 0}
+  bgColor="bg-red-600"
+  textColor="text-red-600"
+  linkTo="/admin/news?video=true"
+/>
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Quick Actions Card */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
+          <h3 className="text-lg font-semibold mb-4 flex items-center">
+            <FiActivity className="mr-2 text-blue-600" aria-hidden="true" />
+            Quick Actions
+          </h3>
           <div className="grid grid-cols-2 gap-4">
-            <Link to="/admin/news/create" className="bg-blue-100 text-blue-700 p-4 rounded-lg hover:bg-blue-200 transition-colors">
-              <FiFileText className="mb-2" size={24} />
-              <span>Create Article</span>
-            </Link>
-            
-            <Link to="/admin/users/create" className="bg-green-100 text-green-700 p-4 rounded-lg hover:bg-green-200 transition-colors">
-              <FiUsers className="mb-2" size={24} />
-              <span>Add User</span>
-            </Link>
-            
-            <Link to="/admin/categories/create" className="bg-purple-100 text-purple-700 p-4 rounded-lg hover:bg-purple-200 transition-colors">
-              <FiTag className="mb-2" size={24} />
-              <span>Add Category</span>
-            </Link>
-            
-            <Link to="/admin/applications" className="bg-orange-100 text-orange-700 p-4 rounded-lg hover:bg-orange-200 transition-colors">
-              <FiAlertTriangle className="mb-2" size={24} />
-              <span>Review Applications</span>
-            </Link>
-          </div>
+  <Link 
+    to="/admin/news/create" 
+    className="bg-blue-100 text-blue-700 p-4 rounded-lg hover:bg-blue-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+    aria-label="Create new article"
+  >
+    <FiFileText className="mb-2" size={24} aria-hidden="true" />
+    <span>Create Article</span>
+  </Link>
+  
+  <Link 
+    to="/admin/users/create" 
+    className="bg-green-100 text-green-700 p-4 rounded-lg hover:bg-green-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-green-500"
+    aria-label="Add new user"
+  >
+    <FiUsers className="mb-2" size={24} aria-hidden="true" />
+    <span>Add User</span>
+  </Link>
+  
+  <Link 
+    to="/admin/categories/create" 
+    className="bg-purple-100 text-purple-700 p-4 rounded-lg hover:bg-purple-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+    aria-label="Add new category"
+  >
+    <FiTag className="mb-2" size={24} aria-hidden="true" />
+    <span>Add Category</span>
+  </Link>
+  
+  <Link 
+    to="/admin/people/create" 
+    className="bg-indigo-100 text-indigo-700 p-4 rounded-lg hover:bg-indigo-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-indigo-500"
+    aria-label="Add new person"
+  >
+    <FiUser className="mb-2" size={24} aria-hidden="true" />
+    <span>Add Person</span>
+  </Link>
+  
+  <Link 
+    to="/admin/applications" 
+    className="bg-orange-100 text-orange-700 p-4 rounded-lg hover:bg-orange-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-orange-500"
+    aria-label="Review reporter applications"
+  >
+    <FiAlertTriangle className="mb-2" size={24} aria-hidden="true" />
+    <span>Review Applications</span>
+    {stats.pendingApplications > 0 && (
+      <span className="mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-500 text-white">
+        {stats.pendingApplications}
+      </span>
+    )}
+  </Link>
+  
+  <Link 
+    to="/videos" 
+    className="bg-red-100 text-red-700 p-4 rounded-lg hover:bg-red-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-red-500"
+    aria-label="Browse video news"
+  >
+    <FiVideo className="mb-2" size={24} aria-hidden="true" />
+    <span>Video News</span>
+  </Link>
+</div>
         </div>
         
+        {/* Recent Activity Card */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
-          <div className="space-y-4">
-            {stats.recentActivity && stats.recentActivity.length > 0 ? (
-              stats.recentActivity.map((activity, index) => (
-                <div key={index} className={`border-l-4 ${getActivityBorderColor(activity.type)} pl-4 py-1`}>
-                  <p className="text-sm text-gray-600">{formatRelativeTime(activity.timestamp)}</p>
-                  {getActivityMessage(activity)}
+          <h3 className="text-lg font-semibold mb-4 flex items-center">
+            <FiActivity className="mr-2 text-indigo-600" aria-hidden="true" />
+            Recent Activity
+          </h3>
+          
+          {refreshing && (
+            <div className="flex justify-center items-center py-4" aria-live="polite">
+              <div className="animate-pulse text-gray-400">Updating activity...</div>
+            </div>
+          )}
+          
+          {!refreshing && (
+            <div className="space-y-4 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+              {stats.recentActivity && stats.recentActivity.length > 0 ? (
+                stats.recentActivity.map((activity, index) => (
+                  <ActivityItem key={index} activity={activity} />
+                ))
+              ) : (
+                <div className="text-center py-6 text-gray-500">
+                  <FiActivity className="mx-auto h-10 w-10 text-gray-400 mb-2" aria-hidden="true" />
+                  <p>No recent activity</p>
                 </div>
-              ))
-            ) : (
-              <p className="text-gray-500">No recent activity</p>
-            )}
-          </div>
+              )}
+            </div>
+          )}
+          
+          {stats.recentActivity && stats.recentActivity.length > 0 && (
+            <div className="mt-4 text-right">
+              <Link 
+                to="/admin/activity" 
+                className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+              >
+                View all activity →
+              </Link>
+            </div>
+          )}
         </div>
       </div>
+      
+      {/* Add custom CSS for scrollbar */}
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #ccc;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #999;
+        }
+      `}</style>
     </div>
   );
 };

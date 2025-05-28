@@ -22,6 +22,22 @@ const login = async (userData) => {
   return response.data;
 };
 
+// Logout user
+const logout = () => {
+  localStorage.removeItem('user');
+};
+
+// Check if user is authenticated
+const isAuthenticated = () => {
+  const user = JSON.parse(localStorage.getItem('user'));
+  return user && user.token ? true : false;
+};
+
+// Get current user data
+const getCurrentUser = () => {
+  return JSON.parse(localStorage.getItem('user'));
+};
+
 // Get user profile
 const getUserProfile = async () => {
   const response = await api.get('/auth/profile');
@@ -48,9 +64,12 @@ const applyForReporter = async (motivation) => {
 const authService = {
   register,
   login,
+  logout,
   getUserProfile,
   updateUserProfile,
-  applyForReporter
+  applyForReporter,
+  isAuthenticated,
+  getCurrentUser
 };
 
 export default authService;

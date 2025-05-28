@@ -69,10 +69,10 @@ const CategoryManagement = () => {
         description: categoryDescription
       };
       
-      const updatedCategory = await categoryService.updateCategory(editingCategory._id, categoryData);
+      const updatedCategory = await categoryService.updateCategory(editingCategory.id, categoryData);
       
       setCategories(categories.map(cat => 
-        cat._id === editingCategory._id ? updatedCategory : cat
+        cat.id === editingCategory.id ? updatedCategory : cat
       ));
       
       setNewCategory('');
@@ -86,8 +86,8 @@ const CategoryManagement = () => {
 
   const handleDeleteCategory = async () => {
     try {
-      await categoryService.deleteCategory(selectedCategory._id);
-      setCategories(categories.filter(cat => cat._id !== selectedCategory._id));
+      await categoryService.deleteCategory(selectedCategory.id);
+      setCategories(categories.filter(cat => cat.id !== selectedCategory.id));
       setShowDeleteModal(false);
       setSelectedCategory(null);
       
@@ -194,7 +194,7 @@ const CategoryManagement = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {categories.length > 0 ? (
                   categories.map((category) => (
-                    <tr key={category._id} className="hover:bg-gray-50">
+                    <tr key={category.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">{category.name}</div>
                         {category.description && (

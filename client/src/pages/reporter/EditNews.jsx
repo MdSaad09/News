@@ -4,6 +4,8 @@ import { useSelector } from 'react-redux';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { FiSave, FiImage, FiX, FiTag, FiPlus, FiLoader } from 'react-icons/fi';
+// Add this import at the top of the file
+import { getImageUrl } from '../../utils/imageUtils';
 
 const EditNews = () => {
   const { id } = useParams();
@@ -294,7 +296,7 @@ const EditNews = () => {
             <div className="mt-2">
               <div className="relative inline-block">
                 <img 
-                  src={formData.coverImage} 
+                  src={getImageUrl(formData.coverImage)} 
                   alt="Cover Preview" 
                   className="h-40 w-auto rounded-md"
                 />

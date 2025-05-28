@@ -1,12 +1,11 @@
-// Add asyncHandler if it's not already defined
 
 const { parseDocumentContent } = require('../utils/documentParser');
 const path = require('path');
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/temp/' });
 const asyncHandler = require('express-async-handler');
-const News = require('../models/News'); // Adjust path if needed
-const mongoose = require('mongoose');
+const { News, User, Category, Comment, Person } = require('../models');
+const { Op } = require('sequelize');
 
 // @desc    Get all published news
 // @route   GET /api/news
@@ -16,33 +15,77 @@ const getPublishedNews = asyncHandler(async (req, res) => {
     const pageSize = 10;
     const page = Number(req.query.pageNumber) || 1;
     
-    const keyword = req.query.keyword
-      ? {
-          title: {
-            $regex: req.query.keyword,
-            $options: 'i',
-          },
-        }
-      : {};
+    // Build where clause
+    let whereClause = { isPublished: true };
     
-    const category = req.query.category ? { category: req.query.category } : {};
+    // Add keyword search if provided
+    if (req.query.keyword) {
+      whereClause.title = { [Op.like]: `%${req.query.keyword}%` };
+    }
     
-    // Update the query to check isPublished flag
-    const filter = { 
-      ...keyword, 
-      ...category,
-      isPublished: true
-      // Note: Your model doesn't have a 'status' field, so we've removed it
-    };
+    // Add category filter if provided
+    if (req.query.category) {
+      whereClause.categoryId = req.query.category;
+    }
     
-    const count = await News.countDocuments(filter);
+    // Add video filter if provided
+    if (req.query.hasVideo === 'true') {
+      whereClause.hasVideo = true;
+    }
     
-    const news = await News.find(filter)
-      .populate('author', 'name profilePicture')
-      .sort({ publishedAt: -1 }) // Your model has publishedAt, so we'll use it
-      .limit(pageSize)
-      .skip(pageSize * (page - 1));
-
+    // Setup includes with base models
+    const includeArray = [
+      {
+        model: User,
+        as: 'author',
+        attributes: ['id', 'name', 'profilePicture']
+      },
+      {
+        model: Category,
+        as: 'category',
+        attributes: ['id', 'name', 'slug']
+      }
+    ];
+    
+    // Add person filter if provided
+    if (req.query.personId) {
+      includeArray.push({
+        model: Person,
+        where: { id: req.query.personId },
+        through: { attributes: [] },
+        attributes: ['id', 'name', 'slug', 'image', 'profession']
+      });
+    } else {
+      // Include people without filtering
+      includeArray.push({
+        model: Person,
+        through: { attributes: [] },
+        attributes: ['id', 'name', 'slug', 'image', 'profession']
+      });
+    }
+    
+    // Count with proper filtering
+    let countOptions = { where: whereClause };
+    if (req.query.personId) {
+      countOptions.include = [{
+        model: Person,
+        where: { id: req.query.personId },
+        attributes: []
+      }];
+      countOptions.distinct = true;
+    }
+    
+    const count = await News.count(countOptions);
+    
+    const news = await News.findAll({
+      where: whereClause,
+      include: includeArray,
+      order: [['publishedAt', 'DESC']],
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+      distinct: true // Important for correct count with associations
+    });
+    
     res.json({
       news,
       page,
@@ -55,183 +98,429 @@ const getPublishedNews = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Get news article by id
+// @desc    Get single news article
 // @route   GET /api/news/:id
 // @access  Public
 const getNewsById = asyncHandler(async (req, res) => {
   try {
-    const id = req.params.id;
-    
-    // Check if the id is a valid MongoDB ObjectId
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: 'Invalid news ID format' });
+    const news = await News.findByPk(req.params.id, {
+      include: [
+        {
+          model: User,
+          as: 'author',
+          attributes: ['id', 'name', 'profilePicture', 'bio']
+        },
+        {
+          model: Category,
+          as: 'category',
+          attributes: ['id', 'name', 'slug']
+        },
+        {
+          model: Person,
+          through: { attributes: [] },
+          attributes: ['id', 'name', 'slug', 'image', 'profession']
+        },
+        {
+          model: Comment,
+          as: 'comments',
+          include: [
+            {
+              model: User,
+              as: 'user',
+              attributes: ['id', 'name', 'profilePicture']
+            }
+          ]
+        }
+      ]
+    });
+
+    if (!news) {
+      return res.status(404).json({ message: 'Article not found' });
     }
-    
-    const news = await News.findById(id)
-      .populate('author', 'name profilePicture');
-    
-    if (news) {
-      // Increment view count
-      news.views = (news.views || 0) + 1;
-      await news.save();
-      
-      res.json(news);
-    } else {
-      res.status(404).json({ message: 'News not found' });
-    }
+
+    // Increment views
+    news.views = news.views + 1;
+    await news.save();
+
+    res.json(news);
   } catch (error) {
-    console.error('Error fetching news by ID:', error);
+    console.error(error);
     res.status(500).json({ message: 'Server Error' });
   }
 });
 
 // @desc    Create a news article
 // @route   POST /api/news
-// @access  Private/Admin/Reporter
+// @access  Private/Reporter
 const createNews = asyncHandler(async (req, res) => {
   try {
     const { 
-      title, 
-      content, 
-      summary, 
-      category, 
-      tags,
-      coverImage, // Changed from imageUrl to coverImage to match your model
-      isPublished
+      title, content, summary, categoryId, tags, isPublished,
+      additionalCategories, people, featuredVideo
     } = req.body;
-
-    if (!title || !content || !summary || !category) {
-      res.status(400);
-      throw new Error('Please fill in all required fields');
-    }
-
-    // Check if user is admin
-    const isAdmin = req.user.role === 'admin';
     
-    // Create a proper URL for the uploaded file
-    let coverImageUrl = coverImage;
-    if (req.file) {
-      // Extract the relative path from the full file path
-      const relativePath = req.file.path.split('uploads')[1];
-      // Create a URL that the frontend can access
-      coverImageUrl = `${req.protocol}://${req.get('host')}/uploads${relativePath}`;
+    // Create slug from title
+    const slug = title.toLowerCase().replace(/\s+/g, '-');
+    
+    // Check if article with same slug exists
+    const newsExists = await News.findOne({ where: { slug } });
+    
+    if (newsExists) {
+      return res.status(400).json({ message: 'An article with this title already exists' });
     }
     
-    // Create news with admin auto-publish
-    const newsData = {
+    // Validate category
+    const category = await Category.findByPk(categoryId);
+    if (!category) {
+      return res.status(400).json({ message: 'Invalid category' });
+    }
+    
+    // Process files (images and videos)
+    let coverImage = null;
+    let videoFile = null;
+    let videoThumbnail = null;
+    let hasVideo = false;
+    
+    // Handle file uploads
+    if (req.files) {
+      // Handle cover image
+      if (req.files.coverImage) {
+        coverImage = `/uploads/images/${req.files.coverImage[0].filename}`;
+      }
+      
+      // Handle video
+      if (req.files.video) {
+        videoFile = `/uploads/videos/${req.files.video[0].filename}`;
+        hasVideo = true;
+        
+        // Use video thumbnail if provided
+        if (req.files.videoThumbnail) {
+          videoThumbnail = `/uploads/thumbnails/${req.files.videoThumbnail[0].filename}`;
+        } else {
+          // Fallback to cover image if no thumbnail
+          videoThumbnail = coverImage;
+        }
+      }
+    } else if (req.file) {
+      // Handle single file upload (backward compatibility)
+      coverImage = `/uploads/images/${req.file.filename}`;
+    }
+
+    // Check if we have URLs instead of files (for pre-uploaded content)
+    if (!coverImage && req.body.coverImage) {
+      coverImage = req.body.coverImage;
+    }
+
+    if (!videoFile && req.body.featuredVideo) {
+      videoFile = req.body.featuredVideo;
+      hasVideo = true;
+    }
+
+    if (!videoThumbnail && req.body.videoThumbnail) {
+      videoThumbnail = req.body.videoThumbnail;
+    }
+    
+    // Check if we have a featured video URL
+    if (featuredVideo && !videoFile) {
+      hasVideo = true;
+      videoThumbnail = coverImage; // Use cover image as thumbnail
+    }
+    
+    // Create news article
+    const news = await News.create({
       title,
       content,
       summary,
-      category,
-      tags: tags || [],
-      author: req.user._id,
-      coverImage: coverImageUrl, // Use the URL instead of the file path
-      media: [], // Initialize as empty array
-      // Force publish for admin, otherwise use what was sent or default to false
-      isPublished: isAdmin ? true : (isPublished || false),
-    };
-
-    // If the news is to be published, set publishedAt date
-    if (newsData.isPublished) {
-      newsData.publishedAt = new Date();
-    }
-
-    const news = new News(newsData);
-    const createdNews = await news.save();
-
-    // Log the created news item for debugging
-    console.log('Created news:', {
-      id: createdNews._id,
-      title: createdNews.title,
-      isPublished: createdNews.isPublished,
-      publishedAt: createdNews.publishedAt
+      slug,
+      categoryId,
+      authorId: req.user.id,
+      coverImage: coverImage || '/uploads/images/default.jpg', // Default image
+      featuredVideo: videoFile || featuredVideo || null,
+      hasVideo: hasVideo,
+      videoThumbnail: videoThumbnail,
+      additionalCategories: additionalCategories ? 
+        (typeof additionalCategories === 'string' ? JSON.parse(additionalCategories) : additionalCategories) : 
+        [],
+      tags: tags ? 
+        (typeof tags === 'string' ? JSON.parse(tags) : tags) : 
+        [],
+      isPublished: isPublished === 'true',
+      publishedAt: isPublished === 'true' ? new Date() : null,
+      views: 0
     });
-
+    
+    // Associate with people if provided
+    if (people) {
+      const peopleIds = typeof people === 'string' ? JSON.parse(people) : people;
+      if (Array.isArray(peopleIds) && peopleIds.length > 0) {
+        await news.addPeople(peopleIds);
+      }
+    }
+    
+    // If reporter publishes an article, increment their articlesPublished count
+    if (isPublished === 'true' && req.user.role === 'reporter') {
+      const reporter = await User.findByPk(req.user.id);
+      reporter.articlesPublished = (reporter.articlesPublished || 0) + 1;
+      await reporter.save();
+    }
+    
+    // Return with associations
+    const createdNews = await News.findByPk(news.id, {
+      include: [
+        {
+          model: Category,
+          as: 'category',
+          attributes: ['id', 'name', 'slug']
+        },
+        {
+          model: Person,
+          through: { attributes: [] },
+          attributes: ['id', 'name', 'slug', 'image', 'profession']
+        },
+        {
+          model: User,
+          as: 'author',
+          attributes: ['id', 'name', 'profilePicture']
+        }
+      ]
+    });
+    
     res.status(201).json(createdNews);
   } catch (error) {
-    console.error('Error creating news:', error);
-    res.status(500).json({ message: error.message || 'Server Error' });
+    console.error(error);
+    res.status(500).json({ message: 'Server Error' });
   }
 });
 
 // @desc    Update a news article
 // @route   PUT /api/news/:id
-// @access  Private/Admin/Reporter
+// @access  Private/Reporter
 const updateNews = asyncHandler(async (req, res) => {
   try {
-    const news = await News.findById(req.params.id);
-    
-    if (!news) {
-      res.status(404);
-      throw new Error('News not found');
-    }
-    
-    // Check if user is authorized to update this news
-    // Admin can update any news, reporter can only update their own
-    if (req.user.role !== 'admin' && news.author.toString() !== req.user._id.toString()) {
-      res.status(403);
-      throw new Error('Not authorized to update this news article');
-    }
-    
     const { 
-      title, 
-      content, 
-      summary, 
-      category, 
-      tags,
-      coverImage,
-      isPublished
+      title, content, summary, categoryId, tags, isPublished,
+      additionalCategories, people, featuredVideo, removeVideo
     } = req.body;
     
-    // Check if user is admin
-    const isAdmin = req.user.role === 'admin';
+    const news = await News.findByPk(req.params.id, {
+      include: [{ model: Person }]
+    });
     
-    // Update fields if provided
-    if (title) news.title = title;
+    if (!news) {
+      return res.status(404).json({ message: 'Article not found' });
+    }
+    
+    // Check if user is author or admin
+    if (news.authorId !== req.user.id && req.user.role !== 'admin') {
+      return res.status(401).json({ message: 'Not authorized to edit this article' });
+    }
+    
+    // Update fields
+    if (title) {
+      news.title = title;
+      news.slug = title.toLowerCase().replace(/\s+/g, '-');
+    }
+    
     if (content) news.content = content;
     if (summary) news.summary = summary;
-    if (category) news.category = category;
-    if (tags) news.tags = tags;
-    if (coverImage) news.coverImage = coverImage;
+    if (categoryId) news.categoryId = categoryId;
     
-    // Handle publication status
-    // For admin, always publish unless explicitly set to false
-    if (isAdmin) {
-      const shouldPublish = isPublished !== false; // Default to true if not specified
+    if (tags) {
+      news.tags = typeof tags === 'string' ? JSON.parse(tags) : tags;
+    }
+    
+    if (additionalCategories) {
+      news.additionalCategories = typeof additionalCategories === 'string' ? 
+        JSON.parse(additionalCategories) : additionalCategories;
+    }
+    
+    // Process files (images and videos)
+    let videoFile = null;
+    let videoThumbnail = null;
+    
+    // Handle file uploads
+    if (req.files) {
+      // Handle cover image
+      if (req.files.coverImage) {
+        news.coverImage = `/uploads/images/${req.files.coverImage[0].filename}`;
+      }
       
-      // If publication status is changing
-      if (news.isPublished !== shouldPublish) {
-        news.isPublished = shouldPublish;
-        // Set publishedAt if being published for the first time
-        if (shouldPublish && !news.publishedAt) {
-          news.publishedAt = new Date();
+      // Handle video
+      if (req.files.video) {
+        videoFile = `/uploads/videos/${req.files.video[0].filename}`;
+        news.hasVideo = true;
+        news.featuredVideo = videoFile;
+        
+        // Use video thumbnail if provided
+        if (req.files.videoThumbnail) {
+          videoThumbnail = `/uploads/thumbnails/${req.files.videoThumbnail[0].filename}`;
+          news.videoThumbnail = videoThumbnail;
+        } else if (!news.videoThumbnail) {
+          // Fallback to cover image if no thumbnail exists
+          news.videoThumbnail = news.coverImage;
         }
       }
-    } else {
-      // For non-admin, use the provided isPublished value
-      if (isPublished !== undefined) {
-        news.isPublished = isPublished;
-        // Set publishedAt if being published for the first time
-        if (isPublished && !news.publishedAt) {
-          news.publishedAt = new Date();
+    } else if (req.file) {
+      // Handle single file upload (backward compatibility)
+      news.coverImage = `/uploads/images/${req.file.filename}`;
+    }
+    
+    // Handle featured video URL
+    if (featuredVideo) {
+      news.featuredVideo = featuredVideo;
+      news.hasVideo = true;
+      
+      // If no video thumbnail, use cover image
+      if (!news.videoThumbnail) {
+        news.videoThumbnail = news.coverImage;
+      }
+    }
+    
+    // Handle video removal
+    if (removeVideo === 'true') {
+      news.featuredVideo = null;
+      news.hasVideo = false;
+      news.videoThumbnail = null;
+    }
+    
+    // Handle publishing status change
+    if (isPublished !== undefined) {
+      const wasPublished = news.isPublished;
+      news.isPublished = isPublished === 'true';
+      
+      // If publishing for the first time, set publishedAt
+      if (!wasPublished && news.isPublished) {
+        news.publishedAt = new Date();
+        
+        // Increment reporter's articlesPublished count
+        if (req.user.role === 'reporter') {
+          const reporter = await User.findByPk(req.user.id);
+          reporter.articlesPublished = (reporter.articlesPublished || 0) + 1;
+          await reporter.save();
         }
       }
     }
     
-    const updatedNews = await news.save();
+    await news.save();
     
-    // Log the updated news item for debugging
-    console.log('Updated news:', {
-      id: updatedNews._id,
-      title: updatedNews.title,
-      isPublished: updatedNews.isPublished,
-      publishedAt: updatedNews.publishedAt
+    // Update person associations if provided
+    if (people) {
+      const peopleIds = typeof people === 'string' ? JSON.parse(people) : people;
+      if (Array.isArray(peopleIds)) {
+        // Remove all current associations
+        await news.setPeople([]);
+        
+        // Add new associations
+        if (peopleIds.length > 0) {
+          await news.addPeople(peopleIds);
+        }
+      }
+    }
+    
+    // Get updated news with associations
+    const updatedNews = await News.findByPk(news.id, {
+      include: [
+        {
+          model: Category,
+          as: 'category',
+          attributes: ['id', 'name', 'slug']
+        },
+        {
+          model: Person,
+          through: { attributes: [] },
+          attributes: ['id', 'name', 'slug', 'image', 'profession']
+        },
+        {
+          model: User,
+          as: 'author',
+          attributes: ['id', 'name', 'profilePicture']
+        }
+      ]
     });
     
     res.json(updatedNews);
   } catch (error) {
-    console.error('Error updating news:', error);
-    res.status(500).json({ message: error.message || 'Server Error' });
+    console.error(error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
+
+// @desc    Get news with videos
+// @route   GET /api/news/videos
+// @access  Public
+const getVideoNews = asyncHandler(async (req, res) => {
+  try {
+    const pageSize = 10;
+    const page = Number(req.query.pageNumber) || 1;
+    
+    // Build where clause for videos
+    const whereClause = { 
+      isPublished: true,
+      hasVideo: true
+    };
+    
+    const count = await News.count({ where: whereClause });
+    
+    const news = await News.findAll({
+      where: whereClause,
+      include: [
+        {
+          model: User,
+          as: 'author',
+          attributes: ['id', 'name', 'profilePicture']
+        },
+        {
+          model: Category,
+          as: 'category',
+          attributes: ['id', 'name', 'slug']
+        },
+        {
+          model: Person,
+          through: { attributes: [] },
+          attributes: ['id', 'name', 'slug', 'image']
+        }
+      ],
+      order: [['publishedAt', 'DESC']],
+      limit: pageSize,
+      offset: (page - 1) * pageSize
+    });
+    
+    res.json({
+      news,
+      page,
+      pages: Math.ceil(count / pageSize),
+      totalCount: count,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
+
+
+
+// @desc    Delete a news article
+// @route   DELETE /api/news/:id
+// @access  Private/Reporter or Admin
+const deleteNews = asyncHandler(async (req, res) => {
+  try {
+    const news = await News.findByPk(req.params.id);
+    
+    if (!news) {
+      return res.status(404).json({ message: 'Article not found' });
+    }
+    
+    // Check if user is author or admin
+    if (news.authorId !== req.user.id && req.user.role !== 'admin') {
+      return res.status(401).json({ message: 'Not authorized to delete this article' });
+    }
+    
+    await news.destroy();
+    
+    res.json({ message: 'Article removed' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server Error' });
   }
 });
 
@@ -240,8 +529,17 @@ const updateNews = asyncHandler(async (req, res) => {
 // @access  Private/Reporter
 const getReporterNews = asyncHandler(async (req, res) => {
   try {
-    const news = await News.find({ author: req.user._id })
-      .sort({ createdAt: -1 });
+    const news = await News.findAll({
+      where: { authorId: req.user.id },
+      include: [
+        {
+          model: Category,
+          as: 'category',
+          attributes: ['id', 'name']
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
     
     res.json(news);
   } catch (error) {
@@ -250,92 +548,119 @@ const getReporterNews = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Get all news for admin
+// @desc    Import news from document
+// @route   POST /api/news/import
+// @access  Private/Reporter
+const importNews = asyncHandler(async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'Please upload a file' });
+    }
+    
+    const filePath = path.join(__dirname, '..', req.file.path);
+    const { title, content } = await parseDocumentContent(filePath);
+    
+    res.json({ title, content });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error importing document' });
+  }
+});
+
+// @desc    Get all news (published and unpublished)
 // @route   GET /api/news/admin
 // @access  Private/Admin
 const getAllNews = asyncHandler(async (req, res) => {
   try {
-    // Build filter object based on query parameters
-    const filter = {};
+    const pageSize = 10;
+    const page = Number(req.query.pageNumber) || 1;
+    
+    // Build where clause
+    let whereClause = {};
+    
+    // Add keyword search if provided
+    if (req.query.keyword) {
+      whereClause.title = { [Op.like]: `%${req.query.keyword}%` };
+    }
+    
+    // Add category filter if provided
+    if (req.query.category) {
+      whereClause.categoryId = req.query.category;
+    }
     
     // Add status filter if provided
-    if (req.query.status) {
-      if (req.query.status === 'pending') {
-        filter.isPublished = false;
-      } else if (req.query.status === 'published') {
-        filter.isPublished = true;
-      }
+    if (req.query.status === 'published') {
+      whereClause.isPublished = true;
+    } else if (req.query.status === 'draft') {
+      whereClause.isPublished = false;
     }
     
-    // Add search filter if provided
-    if (req.query.search) {
-      filter.$or = [
-        { title: { $regex: req.query.search, $options: 'i' } },
-        { content: { $regex: req.query.search, $options: 'i' } }
-      ];
-    }
+    const count = await News.count({ where: whereClause });
     
-    // Get all news with filters
-    const news = await News.find(filter)
-      .populate('author', 'name email')
-      .sort({ createdAt: -1 });
+    const news = await News.findAll({
+      where: whereClause,
+      include: [
+        {
+          model: User,
+          as: 'author',
+          attributes: ['id', 'name', 'profilePicture']
+        },
+        {
+          model: Category,
+          as: 'category',
+          attributes: ['id', 'name', 'slug']
+        }
+      ],
+      order: [['createdAt', 'DESC']],
+      limit: pageSize,
+      offset: (page - 1) * pageSize
+    });
     
-    res.json(news);
+    res.json({
+      news,
+      page,
+      pages: Math.ceil(count / pageSize),
+      totalCount: count,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });
   }
 });
 
-// @desc    Toggle publish status
+// @desc    Toggle publish status of a news article
 // @route   PUT /api/news/:id/publish
 // @access  Private/Admin
 const togglePublishNews = asyncHandler(async (req, res) => {
   try {
-    const news = await News.findById(req.params.id);
+    const news = await News.findByPk(req.params.id);
     
     if (!news) {
-      res.status(404);
-      throw new Error('News not found');
+      return res.status(404).json({ message: 'Article not found' });
     }
     
     // Toggle publish status
     news.isPublished = !news.isPublished;
     
-    // Set or clear publishedAt
-    if (news.isPublished) {
+    // If publishing for the first time, set publishedAt
+    if (news.isPublished && !news.publishedAt) {
       news.publishedAt = new Date();
+      
+      // Increment reporter's articlesPublished count
+      const reporter = await User.findByPk(news.authorId);
+      if (reporter && reporter.role === 'reporter') {
+        reporter.articlesPublished = (reporter.articlesPublished || 0) + 1;
+        await reporter.save();
+      }
     }
     
-    const updatedNews = await news.save();
+    await news.save();
     
-    res.json(updatedNews);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error' });
-  }
-});
-
-// @desc    Delete a news article
-// @route   DELETE /api/news/:id
-// @access  Private/Admin
-const deleteNews = asyncHandler(async (req, res) => {
-  try {
-    const news = await News.findById(req.params.id);
-    
-    if (!news) {
-      res.status(404);
-      throw new Error('News not found');
-    }
-
-    if (req.user.role !== 'admin' && news.author.toString() !== req.user._id.toString()) {
-      res.status(403);
-      throw new Error('Not authorized to delete this news article');
-    }
-    
-    await news.deleteOne();
-    
-    res.json({ message: 'News removed' });
+    res.json({
+      id: news.id,
+      isPublished: news.isPublished,
+      message: news.isPublished ? 'Article published' : 'Article unpublished'
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });
@@ -347,31 +672,96 @@ const deleteNews = asyncHandler(async (req, res) => {
 // @access  Private/Reporter
 const getReporterStats = asyncHandler(async (req, res) => {
   try {
-    const totalArticles = await News.countDocuments({ author: req.user._id });
-    const publishedArticles = await News.countDocuments({ 
-      author: req.user._id, 
-      isPublished: true
+    const timeRange = req.query.timeRange || 'all';
+    let dateFilter = {};
+    
+    // Set date filter based on time range
+    if (timeRange !== 'all') {
+      const now = new Date();
+      let startDate;
+      
+      if (timeRange === 'week') {
+        startDate = new Date(now.setDate(now.getDate() - 7));
+      } else if (timeRange === 'month') {
+        startDate = new Date(now.setMonth(now.getMonth() - 1));
+      } else if (timeRange === 'year') {
+        startDate = new Date(now.setFullYear(now.getFullYear() - 1));
+      }
+      
+      dateFilter = {
+        createdAt: {
+          [Op.gte]: startDate
+        }
+      };
+    }
+    
+    // Get total articles count
+    const totalArticles = await News.count({
+      where: {
+        authorId: req.user.id,
+        ...dateFilter
+      }
     });
-    const pendingArticles = await News.countDocuments({ 
-      author: req.user._id, 
-      isPublished: false
+    
+    // Get published articles count
+    const publishedArticles = await News.count({
+      where: {
+        authorId: req.user.id,
+        isPublished: true,
+        ...dateFilter
+      }
+    });
+    
+    // Get draft articles count
+    const draftArticles = await News.count({
+      where: {
+        authorId: req.user.id,
+        isPublished: false,
+        ...dateFilter
+      }
     });
     
     // Get total views
-    const articles = await News.find({ author: req.user._id });
-    const totalViews = articles.reduce((sum, article) => sum + (article.views || 0), 0);
+    const viewsResult = await News.sum('views', {
+      where: {
+        authorId: req.user.id,
+        isPublished: true,
+        ...dateFilter
+      }
+    });
     
-    // Get top articles by views
-    const topArticles = await News.find({ author: req.user._id })
-      .sort({ views: -1 })
-      .limit(5);
+    const totalViews = viewsResult || 0;
+    
+    // Get most viewed article
+    const mostViewedArticle = await News.findOne({
+      where: {
+        authorId: req.user.id,
+        isPublished: true,
+        ...dateFilter
+      },
+      order: [['views', 'DESC']],
+      attributes: ['id', 'title', 'views', 'publishedAt']
+    });
+    
+    // Get latest published article
+    const latestArticle = await News.findOne({
+      where: {
+        authorId: req.user.id,
+        isPublished: true,
+        ...dateFilter
+      },
+      order: [['publishedAt', 'DESC']],
+      attributes: ['id', 'title', 'views', 'publishedAt']
+    });
     
     res.json({
       totalArticles,
       publishedArticles,
-      pendingArticles,
+      draftArticles,
       totalViews,
-      topArticles
+      mostViewedArticle,
+      latestArticle,
+      timeRange
     });
   } catch (error) {
     console.error(error);
@@ -379,160 +769,84 @@ const getReporterStats = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Import multiple news articles
-// @route   POST /api/news/import
+// @desc    Bulk import news from parsed document
+// @route   POST /api/news/import/parse
 // @access  Private/Admin
-const importNews = asyncHandler(async (req, res) => {
-  try {
-    const { newsItems } = req.body;
-    
-    if (!newsItems || !Array.isArray(newsItems) || newsItems.length === 0) {
-      res.status(400);
-      throw new Error('No valid news items provided');
-    }
-    
-    const importedNews = [];
-    const failedItems = [];
-    
-    for (const item of newsItems) {
-      try {
-        // Validate required fields based on your model
-        if (!item.title || !item.content) {
-          failedItems.push({
-            title: item.title || 'Untitled',
-            reason: 'Missing required fields (title or content)'
-          });
-          continue;
-        }
-        
-        // Create news item - always published for admin
-        const newsItem = new News({
-          title: item.title,
-          content: item.content,
-          summary: item.summary || item.content.substring(0, Math.min(200, item.content.length)) + '...',
-          category: item.category || 'other', // Default to 'other' since it's required
-          tags: item.tags || [],
-          coverImage: item.imageUrl || 'https://via.placeholder.com/800x400?text=No+Image+Available',
-          media: [], // Initialize as empty array
-          author: req.user._id,
-          isPublished: true, // Always published for admin
-          publishedAt: new Date() // Set publish date since it's published
-        });
-        
-        const savedNews = await newsItem.save();
-        importedNews.push(savedNews);
-      } catch (error) {
-        failedItems.push({
-          title: item.title || 'Untitled',
-          reason: error.message
-        });
-      }
-    }
-    
-    res.status(201).json({
-      success: true,
-      imported: importedNews.length,
-      failed: failedItems.length,
-      failedItems,
-      news: importedNews
-    });
-  } catch (error) {
-    console.error('Error importing news:', error);
-    res.status(500).json({ message: error.message || 'Server Error' });
-  }
-});
-
 const bulkImportNews = asyncHandler(async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ message: 'No file uploaded' });
+      return res.status(400).json({ message: 'Please upload a file' });
     }
     
-    const filePath = req.file.path;
-    const fileExtension = path.extname(req.file.originalname).toLowerCase().substring(1);
+    const filePath = path.join(__dirname, '..', req.file.path);
+    const { articles } = await parseDocumentContent(filePath, true);
     
-    // Parse the document based on file type
-    const parsedArticles = await parseDocumentContent(filePath, fileExtension);
-    
-    if (!parsedArticles || parsedArticles.length === 0) {
-      return res.status(400).json({ message: 'No valid articles found in file' });
+    if (!articles || articles.length === 0) {
+      return res.status(400).json({ message: 'No articles found in document' });
     }
     
-    // Return the parsed articles for review in the frontend
-    res.status(200).json({
-      message: `Successfully parsed ${parsedArticles.length} articles`,
-      articles: parsedArticles
-    });
-    
-    // Clean up the temp file
-    fs.unlink(filePath, (err) => {
-      if (err) console.error('Error deleting temp file:', err);
-    });
-  } catch (error) {
-    console.error('Bulk import error:', error);
-    res.status(500).json({ message: error.message || 'Failed to parse document' });
-  }
-});
-
-
-// Add a debug endpoint to check publication status
-const debugNews = asyncHandler(async (req, res) => {
-  try {
-    const allNews = await News.find().lean();
-    const publishedNews = await News.find({ isPublished: true }).lean();
-    const adminNews = await News.find({ 
-      author: { $in: await getUserIdsByRole('admin') } 
-    }).lean();
+    // Process each article
+    const results = [];
+    for (const article of articles) {
+      // Create slug from title
+      const slug = article.title.toLowerCase().replace(/\s+/g, '-');
+      
+      // Check if article with same slug exists
+      const newsExists = await News.findOne({ where: { slug } });
+      
+      if (newsExists) {
+        results.push({
+          title: article.title,
+          status: 'skipped',
+          reason: 'Article with this title already exists'
+        });
+        continue;
+      }
+      
+      // Create news article
+      const news = await News.create({
+        title: article.title,
+        content: article.content,
+        summary: article.summary || article.content.substring(0, 150) + '...',
+        slug,
+        categoryId: article.categoryId || 1, // Default category
+        authorId: req.user.id,
+        coverImage: article.coverImage || null,
+        tags: article.tags || [],
+        isPublished: article.isPublished || false,
+        publishedAt: article.isPublished ? new Date() : null,
+        views: 0
+      });
+      
+      results.push({
+        id: news.id,
+        title: news.title,
+        status: 'imported',
+        isPublished: news.isPublished
+      });
+    }
     
     res.json({
-      total: allNews.length,
-      published: publishedNews.length,
-      adminCreated: adminNews.length,
-      samples: {
-        all: allNews.slice(0, 3).map(n => ({ 
-          id: n._id, 
-          title: n.title, 
-          isPublished: n.isPublished, 
-          publishedAt: n.publishedAt,
-          author: n.author,
-          category: n.category,
-          summary: n.summary && n.summary.substring(0, 30) + '...',
-          coverImage: n.coverImage ? "✓" : "✗"
-        })),
-        published: publishedNews.slice(0, 3).map(n => ({ 
-          id: n._id, 
-          title: n.title, 
-          isPublished: n.isPublished, 
-          publishedAt: n.publishedAt,
-          author: n.author,
-          category: n.category
-        }))
-      }
+      message: `Imported ${results.filter(r => r.status === 'imported').length} articles`,
+      results
     });
   } catch (error) {
-    console.error('Debug error:', error);
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ message: 'Error importing articles' });
   }
 });
-
-// Helper function to get user IDs by role
-const getUserIdsByRole = async (role) => {
-  const User = require('../models/User'); // Adjust path if needed
-  const users = await User.find({ role }).lean();
-  return users.map(u => u._id);
-};
 
 module.exports = {
   getPublishedNews,
   getNewsById,
   createNews,
   updateNews,
+  deleteNews,
   getReporterNews,
+  importNews,
   getAllNews,
   togglePublishNews,
-  deleteNews,
   getReporterStats,
-  importNews,
   bulkImportNews,
-  
+  getVideoNews
 };

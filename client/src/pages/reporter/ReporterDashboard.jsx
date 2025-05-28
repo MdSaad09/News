@@ -13,6 +13,9 @@ import {
 import CreateNews from './CreateNews';
 import EditNews from './EditNews';
 
+// Add this import at the top of the file
+import { getImageUrl } from '../../utils/imageUtils';
+
 const ReporterDashboard = () => {
   const location = useLocation();
   const { user } = useSelector((state) => state.auth);
@@ -60,10 +63,10 @@ const ReporterDashboard = () => {
         }
       };
       
-      await axios.delete(`http://localhost:5000/api/news/${selectedArticle._id}`, config);
+      await axios.delete(`http://localhost:5000/api/news/${selectedArticle.id}`, config);
 
       // Update the local state
-      setNews(news.filter(article => article._id !== selectedArticle._id));
+      setNews(news.filter(article => article.id !== selectedArticle.id));
       setShowDeleteModal(false);
       setSelectedArticle(null);
       
@@ -205,11 +208,11 @@ const ReporterDashboard = () => {
           ) : (
             <div className="grid grid-cols-1 gap-6">
               {filteredNews.map((article) => (
-                <div key={article._id} className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div key={article.id} className="bg-white rounded-lg shadow-md overflow-hidden">
                   <div className="md:flex">
                     <div className="md:flex-shrink-0">
                       <img 
-                        src={article.coverImage} 
+                        src={getImageUrl(article.coverImage)} 
                         alt={article.title} 
                         className="h-48 w-full md:w-48 object-cover"
                       />
@@ -241,14 +244,14 @@ const ReporterDashboard = () => {
                         </div>
                         <div className="flex space-x-2 mt-4 md:mt-0">
                           <Link 
-                            to={`/news/${article._id}`} 
+                            to={`/news/${article.id}`} 
                             
                             className="p-2 text-indigo-600 hover:text-indigo-900"
                           >
                             <FiEye size={20} />
                           </Link>
                           <Link 
-                            to={`/reporter/edit/${article._id}`}
+                            to={`/reporter/edit/${article.id}`}
                             className="p-2 text-blue-600 hover:text-blue-900"
                           >
                             <FiEdit size={20} />

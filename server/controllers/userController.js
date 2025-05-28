@@ -1,11 +1,13 @@
-const User = require('../models/User');
+const { User, News } = require('../models');
 
 // @desc    Get all users
 // @route   GET /api/users
 // @access  Private/Admin
 const getUsers = async (req, res) => {
   try {
-    const users = await User.find({}).select('-password');
+    const users = await User.findAll({
+      attributes: { exclude: ['password'] }
+    });
     res.json(users);
   } catch (error) {
     console.error(error);
@@ -18,7 +20,9 @@ const getUsers = async (req, res) => {
 // @access  Private/Admin
 const getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('-password');
+    const user = await User.findByPk(req.params.id, {
+      attributes: { exclude: ['password'] }
+    });
 
     if (user) {
       res.json(user);
@@ -36,26 +40,29 @@ const getUserById = async (req, res) => {
 // @access  Private/Admin
 const updateUser = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const user = await User.findByPk(req.params.id);
 
     if (user) {
       user.name = req.body.name || user.name;
       user.email = req.body.email || user.email;
       user.role = req.body.role || user.role;
 
-      const updatedUser = await user.save();
+      await user.save();
 
       res.json({
-        _id: updatedUser._id,
-        name: updatedUser.name,
-        email: updatedUser.email,
-        role: updatedUser.role,
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role
       });
     } else {
       res.status(404).json({ message: 'User not found' });
     }
   } catch (error) {
     console.error(error);
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
     res.status(500).json({ message: 'Server Error' });
   }
 };
@@ -65,10 +72,21 @@ const updateUser = async (req, res) => {
 // @access  Private/Admin
 const deleteUser = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const user = await User.findByPk(req.params.id);
 
     if (user) {
-      await user.deleteOne();
+      // Check if user has published articles
+      const articleCount = await News.count({
+        where: { authorId: user.id }
+      });
+
+      if (articleCount > 0) {
+        return res.status(400).json({
+          message: 'Cannot delete user with published articles. Reassign or delete articles first.'
+        });
+      }
+
+      await user.destroy();
       res.json({ message: 'User removed' });
     } else {
       res.status(404).json({ message: 'User not found' });
@@ -79,61 +97,65 @@ const deleteUser = async (req, res) => {
   }
 };
 
-
-
-// @desc    Get all reporter applications
+// @desc    Get reporter applications
 // @route   GET /api/users/reporter-applications
-// @access  Private (Admin only)
+// @access  Private/Admin
 const getReporterApplications = async (req, res) => {
   try {
-    const applications = await User.find({
-      'reporterApplication.status': 'pending'
-    }).select('name email bio reporterApplication createdAt');
+    const applications = await User.findAll({
+      where: {
+        reporterApplicationStatus: 'pending'
+      },
+      attributes: { exclude: ['password'] }
+    });
 
-    res.status(200).json(applications);
+    res.json(applications);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });
   }
 };
 
-// @desc    Review reporter application (approve/reject)
+// @desc    Update reporter application status
 // @route   PUT /api/users/reporter-applications/:userId
 // @access  Private/Admin
-const reviewReporterApplication = async (req, res) => {
+const updateReporterStatus = async (req, res) => {
   try {
     const { status, feedback } = req.body;
-    
-    if (!status || !['approved', 'rejected'].includes(status)) {
-      return res.status(400).json({ message: 'Invalid status' });
-    }
-    
-    if (status === 'rejected' && (!feedback || feedback.trim() === '')) {
-      return res.status(400).json({ message: 'Feedback is required for rejection' });
-    }
-    
-    const user = await User.findById(req.params.userId);
-    
+    const user = await User.findByPk(req.params.userId); // Changed to userId to match route
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
-    if (user.reporterApplication.status !== 'pending') {
-      return res.status(400).json({ message: 'This application is not pending' });
+
+    if (user.reporterApplicationStatus !== 'pending') {
+      return res.status(400).json({ message: 'User does not have a pending application' });
     }
-    
-    // Update user
-    user.reporterApplication.status = status;
-    user.reporterApplication.feedback = feedback || '';
-    
-    // If approved, update role to reporter
+
     if (status === 'approved') {
       user.role = 'reporter';
+      user.reporterApplicationStatus = 'approved';
+    } else if (status === 'rejected') {
+      user.reporterApplicationStatus = 'rejected';
+    } else {
+      return res.status(400).json({ message: 'Invalid status' });
     }
     
+    // Save feedback if provided
+    if (feedback) {
+      user.reporterApplicationFeedback = feedback;
+    }
+
     await user.save();
-    
-    res.status(200).json({ message: `Application ${status} successfully` });
+
+    res.json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      reporterApplicationStatus: user.reporterApplicationStatus,
+      reporterApplicationFeedback: user.reporterApplicationFeedback
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });
@@ -146,5 +168,5 @@ module.exports = {
   updateUser,
   deleteUser,
   getReporterApplications,
-  reviewReporterApplication,
+  updateReporterStatus
 };

@@ -35,10 +35,10 @@ const ReporterManagement = () => {
   const handleDeleteReporter = async () => {
     try {
       // First, update the user's role back to 'user'
-      await userService.updateUser(selectedReporter._id, { role: 'user' });
+      await userService.updateUser(selectedReporter.id, { role: 'user' });
       
       // Update the local state
-      setReporters(reporters.filter(reporter => reporter._id !== selectedReporter._id));
+      setReporters(reporters.filter(reporter => reporter.id !== selectedReporter.id));
       setShowDeleteModal(false);
       setSelectedReporter(null);
       
@@ -109,7 +109,7 @@ const ReporterManagement = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredReporters.map((reporter) => (
-                  <tr key={reporter._id}>
+                  <tr key={reporter.id}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10">
@@ -151,14 +151,14 @@ const ReporterManagement = () => {
                           <FiMail size={18} />
                         </button>
                         <Link
-                          to={`/admin/reporters/${reporter._id}`}
+                          to={`/admin/reporters/${reporter.id}`}
                           className="text-indigo-600 hover:text-indigo-900"
                           title="View Reporter Details"
                         >
                           <FiEye size={18} />
                         </Link>
                         <Link
-                          to={`/admin/reporters/edit/${reporter._id}`}
+                          to={`/admin/reporters/edit/${reporter.id}`}
                           className="text-green-600 hover:text-green-900"
                           title="Edit Reporter"
                         >

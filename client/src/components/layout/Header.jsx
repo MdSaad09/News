@@ -4,6 +4,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../../redux/slices/authSlice';
 import { FiMenu, FiX, FiUser, FiLogOut, FiSearch, FiBell } from 'react-icons/fi';
 import { toast } from 'react-toastify';
+// Import at the top of the file
+import { getImageUrl } from '../../utils/imageUtils';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -84,8 +86,13 @@ const Header = () => {
                 {/* User Menu */}
                 <div className="relative group">
                   <button className="flex items-center space-x-1 p-1 rounded-full hover:bg-gray-100 transition-colors">
+                    
                     {user.profilePicture ? (
-                      <img src={user.profilePicture} alt={user.name} className="w-8 h-8 rounded-full object-cover" />
+                      <img 
+                        src={getImageUrl(user.profilePicture)} 
+                        alt={user.name} 
+                        className="w-8 h-8 rounded-full object-cover" 
+                      />
                     ) : (
                       <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center">
                         {user.name.charAt(0).toUpperCase()}

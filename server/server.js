@@ -2,23 +2,28 @@ const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const path = require('path');
-const connectDB = require('./config/db');
+const { connectDB } = require('./config/db');
+const initializeDatabase = require('./utils/initDb');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const newsRoutes = require('./routes/newsRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
-const adminRoutes = require('./routes/adminRoutes'); // If you added this from previous implementation
-const categoryRoutes = require('./routes/categoryRoutes'); // If you added this from previous implementation
-const pageRoutes = require('./routes/pageRoutes'); // Add this line
+const adminRoutes = require('./routes/adminRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
+const pageRoutes = require('./routes/pageRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
+const personRoutes = require('./routes/personRoutes');
 
 // Load environment variables
 dotenv.config();
 
 // Connect to database
 connectDB();
+
+// Initialize database models
+initializeDatabase();
 
 const app = express();
 
@@ -35,10 +40,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/upload', uploadRoutes);
-app.use('/api/admin', adminRoutes); // If you added this from previous implementation
-app.use('/api/categories', categoryRoutes); // If you added this from previous implementation
-app.use('/api/pages', pageRoutes); // Add this line
+app.use('/api/admin', adminRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/pages', pageRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/people', personRoutes);
 
 // Base route
 app.get('/', (req, res) => {
