@@ -1,3 +1,4 @@
+// utils/fileUpload.js - FIXED VERSION
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs-extra');
@@ -16,15 +17,23 @@ directories.forEach(dir => {
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     // Determine appropriate folder based on field name and file type
-    let folder = 'images'; // Default
+    let folder = 'images'; // Default folder
+    
+    console.log('File field name:', file.fieldname); // Debug log
+    console.log('Request base URL:', req.baseUrl); // Debug log
     
     if (file.fieldname === 'video') {
       folder = 'videos';
     } else if (file.fieldname === 'videoThumbnail') {
       folder = 'thumbnails';
-    } else if (file.fieldname === 'image' && req.baseUrl.includes('/people')) {
+    } else if (file.fieldname === 'image' && req.baseUrl && req.baseUrl.includes('/people')) {
       folder = 'people';
+    } else if (file.fieldname === 'coverImage') {
+      folder = 'images'; // Explicitly handle coverImage
     }
+    // For any other image-related field, default to 'images'
+    
+    console.log('Selected folder:', folder); // Debug log
     
     const destPath = path.join(uploadDir, folder);
     cb(null, destPath);
@@ -33,12 +42,18 @@ const storage = multer.diskStorage({
     // Create unique filename with original extension
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
-    cb(null, file.fieldname + '-' + uniqueSuffix + ext);
+    const filename = file.fieldname + '-' + uniqueSuffix + ext;
+    
+    console.log('Generated filename:', filename); // Debug log
+    
+    cb(null, filename);
   }
 });
 
 // File filter to validate uploads based on field name
 const fileFilter = (req, file, cb) => {
+  console.log('File filter - fieldname:', file.fieldname, 'mimetype:', file.mimetype); // Debug log
+  
   if (file.fieldname === 'video') {
     // Accept video files
     if (file.mimetype.startsWith('video/')) {
@@ -47,7 +62,7 @@ const fileFilter = (req, file, cb) => {
       cb(new Error('Only video files are allowed for video uploads'), false);
     }
   } else {
-    // Accept image files for other fields
+    // Accept image files for other fields (image, coverImage, videoThumbnail, etc.)
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else {
@@ -101,6 +116,7 @@ const uploadFields = multiUpload.fields([
 const uploadWithErrorHandling = (req, res, next) => {
   upload.single('image')(req, res, (err) => {
     if (err) {
+      console.error('Upload error:', err); // Debug log
       if (err instanceof multer.MulterError) {
         // A Multer error occurred (e.g., file too large)
         if (err.code === 'LIMIT_FILE_SIZE') {
@@ -123,6 +139,7 @@ const uploadWithErrorHandling = (req, res, next) => {
 const multiUploadWithErrorHandling = (req, res, next) => {
   uploadFields(req, res, (err) => {
     if (err) {
+      console.error('Multi-upload error:', err); // Debug log
       if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE') {
           return res.status(400).json({ 

@@ -1,3 +1,4 @@
+// models/index.js - Updated with Advertisement model
 const { sequelize } = require('../config/db');
 const { DataTypes } = require('sequelize');
 
@@ -10,6 +11,7 @@ const Page = require('./Page')(sequelize, DataTypes);
 const Settings = require('./Settings')(sequelize, DataTypes);
 const Person = require('./Person')(sequelize, DataTypes);
 const NewsPersons = require('./NewsPersons')(sequelize, DataTypes);
+const Advertisement = require('./Advertisement')(sequelize, DataTypes);
 
 // Define associations
 User.hasMany(News, { foreignKey: 'authorId', as: 'articles' });
@@ -30,9 +32,13 @@ Page.belongsTo(User, { foreignKey: 'createdById', as: 'createdBy' });
 User.hasMany(Page, { foreignKey: 'lastUpdatedById', as: 'updatedPages' });
 Page.belongsTo(User, { foreignKey: 'lastUpdatedById', as: 'lastUpdatedBy' });
 
-// New associations for Person model
+// Person model associations
 News.belongsToMany(Person, { through: NewsPersons, foreignKey: 'newsId' });
 Person.belongsToMany(News, { through: NewsPersons, foreignKey: 'personId' });
+
+// Advertisement model associations
+User.hasMany(Advertisement, { foreignKey: 'createdById', as: 'advertisements' });
+Advertisement.belongsTo(User, { foreignKey: 'createdById', as: 'createdBy' });
 
 // Sync all models with database
 const syncDatabase = async () => {
@@ -54,7 +60,8 @@ module.exports = {
   Comment,
   Page,
   Settings,
-  Person,         // Export the new model
-  NewsPersons,    // Export the junction model
+  Person,
+  NewsPersons,
+  Advertisement,    // Export the new Advertisement model
   syncDatabase
 };

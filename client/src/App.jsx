@@ -1,4 +1,4 @@
-// Updated App.jsx with new routes
+// Updated App.jsx with Advertisement routes
 import { Routes, Route } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -32,13 +32,16 @@ import SiteSettings from './pages/admin/SiteSettings';
 // New admin pages
 import PeopleManagement from './pages/admin/PeopleManagement';
 import PersonEditor from './pages/admin/PersonEditor';
+// Advertisement pages
+import AdvertisementManagement from './pages/admin/AdvertisementManagement';
+import AdvertisementEditor from './pages/admin/AdvertisementEditor';
+import AdvertisementAnalytics from './pages/admin/AdvertisementAnalytics';
 
 // Reporter pages
 import ReporterDashboard from './pages/reporter/ReporterDashboard';
 import CreateNews from './pages/reporter/CreateNews';
 import EditNews from './pages/reporter/EditNews';
 import ReporterStats from './pages/reporter/ReporterStats';
-
 
 function App() {
   return (
@@ -73,10 +76,15 @@ function App() {
             <Route path="settings" element={<SiteSettings />} />
             <Route path="news/create" element={<NewsEditor />} />
             <Route path="news/edit/:id" element={<NewsEditor />} />
-            {/* New admin routes */}
+            {/* People routes */}
             <Route path="people" element={<PeopleManagement />} />
             <Route path="people/create" element={<PersonEditor />} />
             <Route path="people/edit/:id" element={<PersonEditor />} />
+            {/* Advertisement routes */}
+            <Route path="advertisements" element={<AdvertisementManagement />} />
+            <Route path="advertisements/create" element={<AdvertisementEditor />} />
+            <Route path="advertisements/edit/:id" element={<AdvertisementEditor />} />
+            <Route path="advertisements/analytics/:id" element={<AdvertisementAnalytics />} />
           </Route>
           
           {/* Reporter routes */}
