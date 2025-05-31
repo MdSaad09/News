@@ -5,7 +5,7 @@ import { useSelector } from 'react-redux';
 import { 
   FiUsers, FiFileText, FiUserCheck, FiAlertTriangle, 
   FiEye, FiTag, FiRefreshCw, FiActivity, FiTrendingUp, 
-  FiUser, FiVideo, FiTarget  // Added FiTarget for advertisements
+  FiUser, FiVideo, FiTarget, FiBarChart2  // Added FiTarget for advertisements
 } from 'react-icons/fi';
 import adminService from '../../services/adminService';
 
@@ -369,6 +369,15 @@ const AdminHome = () => {
               <FiUser className="mb-2" size={24} aria-hidden="true" />
               <span>Add Person</span>
             </Link>
+
+            <Link 
+  to="/admin/people/analytics" 
+  className="bg-violet-100 text-violet-700 p-4 rounded-lg hover:bg-violet-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-violet-500"
+  aria-label="View people analytics"
+>
+  <FiBarChart2 className="mb-2" size={24} aria-hidden="true" />
+  <span>People Analytics</span>
+</Link>
             
             <Link 
               to="/admin/applications" 

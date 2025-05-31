@@ -18,6 +18,8 @@ import CategoryManagement from './CategoryManagement';
 import SiteSettings from './SiteSettings';
 import PageManagement from './PageManagement';
 import PeopleManagement from './PeopleManagement';
+// Add this line after line 14 (after PersonEditor import)
+import PeopleAnalytics from './PeopleAnalytics';
 import PersonEditor from './PersonEditor';
 // Advertisement management imports
 import AdvertisementManagement from './AdvertisementManagement';
@@ -76,6 +78,8 @@ const AdminDashboard = () => {
     { path: '/admin/advertisements', icon: <FiTarget size={20} />, label: 'Advertisement Management' }, // New item
     { path: '/admin/pages', icon: <FiGrid size={20} />, label: 'Page Management' },
     { path: '/admin/settings', icon: <FiSettings size={20} />, label: 'Site Settings' },
+      { path: '/admin/people/analytics', icon: <FiBarChart2 size={20} />, label: 'People Analytics' },
+
   ];
   
   // Handle session timeout
@@ -341,6 +345,7 @@ const AdminDashboard = () => {
               <Route path="pages/*" element={<PageManagement />} />
               <Route path="settings/*" element={<SiteSettings />} />
               <Route path="people/*" element={<PeopleManagement />} />
+               <Route path="people/analytics" element={<PeopleAnalytics />} />
               {/* Advertisement Management Routes */}
               <Route path="advertisements" element={<AdvertisementManagement />} />
               <Route path="advertisements/create" element={<AdvertisementEditor />} />

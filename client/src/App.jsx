@@ -1,4 +1,4 @@
-// Updated App.jsx with Advertisement routes
+// Updated App.jsx with Analytics routes
 import { Routes, Route } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -29,9 +29,11 @@ import CategoryManagement from './pages/admin/CategoryManagement';
 import PageManagement from './pages/admin/PageManagement';
 import UserManagement from './pages/admin/UserManagement';
 import SiteSettings from './pages/admin/SiteSettings';
-// New admin pages
+// People management pages
 import PeopleManagement from './pages/admin/PeopleManagement';
 import PersonEditor from './pages/admin/PersonEditor';
+// ✨ NEW: Analytics import
+import PeopleAnalytics from './pages/admin/PeopleAnalytics';
 // Advertisement pages
 import AdvertisementManagement from './pages/admin/AdvertisementManagement';
 import AdvertisementEditor from './pages/admin/AdvertisementEditor';
@@ -80,6 +82,8 @@ function App() {
             <Route path="people" element={<PeopleManagement />} />
             <Route path="people/create" element={<PersonEditor />} />
             <Route path="people/edit/:id" element={<PersonEditor />} />
+            {/* ✨ NEW: Analytics route */}
+            <Route path="people/analytics" element={<PeopleAnalytics />} />
             {/* Advertisement routes */}
             <Route path="advertisements" element={<AdvertisementManagement />} />
             <Route path="advertisements/create" element={<AdvertisementEditor />} />
