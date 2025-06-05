@@ -1,3 +1,4 @@
+// server.js - Updated with Advertisement routes
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
@@ -15,6 +16,7 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const pageRoutes = require('./routes/pageRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const personRoutes = require('./routes/personRoutes');
+const advertisementRoutes = require('./routes/advertisementRoutes'); // New route
 
 // Load environment variables
 dotenv.config();
@@ -45,6 +47,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/pages', pageRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/people', personRoutes);
+app.use('/api/advertisements', advertisementRoutes); // New route
 
 // Base route
 app.get('/', (req, res) => {

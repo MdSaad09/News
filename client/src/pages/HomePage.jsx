@@ -1,9 +1,11 @@
+// src/pages/HomePage.jsx - Updated with Between-Articles Advertisement Integration
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FiArrowRight, FiTrendingUp, FiEye, FiRefreshCw } from 'react-icons/fi';
 import NewsCard from '../components/common/NewsCard';
+import AdDisplay from '../components/advertisements/AdDisplay';
 import newsService from '../services/newsService';
-import { getImageUrl } from '../utils/imageUtils'; // Add this import
+import { getImageUrl } from '../utils/imageUtils';
 
 const HomePage = () => {
   const [news, setNews] = useState([]);
@@ -26,20 +28,14 @@ const HomePage = () => {
       setLoading(true);
       setError(null);
       
-      // Use your news service instead of direct axios call
       const data = await newsService.getAllNews();
       
       if (data.news && data.news.length > 0) {
-        // Set featured news (most recent)
         setFeaturedNews(data.news[0]);
-
-        // Set trending news (most viewed, up to 4)
         const sortedByViews = [...data.news]
           .sort((a, b) => b.views - a.views)
           .slice(0, 4);
         setTrendingNews(sortedByViews);
-
-        // Set remaining news
         setNews(data.news.slice(1));
       }
 
@@ -53,7 +49,6 @@ const HomePage = () => {
   useEffect(() => {
     fetchNews();
     
-    // Optional: Set up auto-refresh every 5 minutes
     const refreshInterval = setInterval(() => {
       fetchNews();
     }, 5 * 60 * 1000);
@@ -66,6 +61,16 @@ const HomePage = () => {
     await fetchNews();
     setRefreshing(false);
   };
+
+  // Get device type for ad targeting
+  const getDeviceType = () => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768 ? 'mobile' : 'desktop';
+    }
+    return 'desktop';
+  };
+
+  const deviceType = getDeviceType();
 
   return (
     <div className="space-y-12 font-montserrat">
@@ -118,14 +123,13 @@ const HomePage = () => {
       {/* Hero Section with Featured News */}
       {!loading && featuredNews && (
         <div className="relative h-[500px] rounded-2xl overflow-hidden">
-          {/* Accessible image with fallback */}
           <img 
             src={getImageUrl(featuredNews.coverImage)} 
             alt={featuredNews.title} 
             className="w-full h-full object-cover"
             onError={(e) => {
               e.target.onerror = null;
-              e.target.src = "/images/news-placeholder.jpg"; // Add a placeholder image
+              e.target.src = "/images/news-placeholder.jpg";
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent"></div>
@@ -146,6 +150,14 @@ const HomePage = () => {
           </div>
         </div>
       )}
+
+      {/* Content Middle Ad */}
+      <AdDisplay 
+        position="content-middle" 
+        page="home" 
+        device={deviceType}
+        className="w-full flex justify-center my-8"
+      />
       
       {/* Trending News Section */}
       {!loading && trendingNews.length > 0 && (
@@ -162,8 +174,8 @@ const HomePage = () => {
                   className="block focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-lg"
                 >
                   <img 
-                    src={article.coverImage} 
-                    alt="" // Decorative image, title is in heading
+                    src={getImageUrl(article.coverImage)} 
+                    alt="" 
                     className="w-full h-40 object-cover rounded-t-lg"
                     onError={(e) => {
                       e.target.onerror = null;
@@ -186,19 +198,35 @@ const HomePage = () => {
         </section>
       )}
       
-      {/* Latest News Section */}
+      {/* Latest News Section with Between-Articles Ads */}
       {!loading && news.length > 0 && (
         <section aria-labelledby="latest-heading">
           <h2 id="latest-heading" className="text-2xl font-bold text-gray-800 mb-6">Latest News</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {news.map((article) => (
-              <NewsCard key={article.id} article={article} />
+            {news.map((article, index) => (
+              <div key={article.id}>
+                <NewsCard article={article} />
+                
+                {/* Between Articles Ad - Show after every 3rd article */}
+                {(index + 1) % 3 === 0 && (
+                  <div className="col-span-full my-8">
+                    <AdDisplay 
+                      position="between-articles" 
+                      page="home" 
+                      device={deviceType}
+                      articleIndex={index}
+                      className="w-full flex justify-center"
+                    />
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </section>
       )}
-            {/* Categories Section */}
-            <section aria-labelledby="categories-heading" className="py-12">
+
+      {/* Categories Section */}
+      <section aria-labelledby="categories-heading" className="py-12">
         <h2 id="categories-heading" className="text-2xl font-bold text-gray-800 mb-8 text-center">Browse News by Category</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {['politics', 'technology', 'sports', 'entertainment', 'business', 'health', 'science', 'other'].map((category) => (
@@ -213,7 +241,6 @@ const HomePage = () => {
           ))}
         </div>
       </section>
-      
     </div>
   );
 };

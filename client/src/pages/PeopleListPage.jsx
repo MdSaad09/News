@@ -1,11 +1,9 @@
-// src/pages/PeopleListPage.jsx
-import { useState, useEffect } from 'react';
+// src/pages/EnhancedPeopleListPage.jsx
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { FiSearch, FiRefreshCw, FiFilter } from 'react-icons/fi';
+import { FiSearch, FiRefreshCw, FiFilter, FiGrid, FiList, FiTrendingUp, FiUsers, FiEye } from 'react-icons/fi';
 import { Helmet } from 'react-helmet';
-import PersonCard from '../components/common/PersonCard';
-
-// Assuming you'll create this service function later
+import EnhancedPersonCard from '../components/common/PersonCard';
 import personService from '../services/personService';
 
 const PeopleListPage = () => {
@@ -14,75 +12,30 @@ const PeopleListPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [professionFilter, setProfessionFilter] = useState('');
-  const [availableProfessions, setAvailableProfessions] = useState([]);
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [sortBy, setSortBy] = useState('name'); // name, newsCount, viewCount, recent
+  const [viewMode, setViewMode] = useState('grid'); // grid, list
+  const [availableCategories, setAvailableCategories] = useState([]);
+  const [followedPeople, setFollowedPeople] = useState(new Set());
   
   useEffect(() => {
-    const fetchPeople = async () => {
-      try {
-        setLoading(true);
-        const data = await personService.getPeople();
-        setPeople(data);
-        setFilteredPeople(data);
-        
-        // Extract unique professions for filter
-        const professions = [...new Set(data.map(person => person.profession).filter(Boolean))];
-        setAvailableProfessions(professions);
-        
-        setLoading(false);
-      } catch (err) {
-        console.error('Error fetching people:', err);
-        setError('Failed to load people. Please try again.');
-        setLoading(false);
-      }
-    };
-    
     fetchPeople();
+    loadFollowedPeople();
   }, []);
   
   useEffect(() => {
-    // Filter people based on search term and profession
-    let results = people;
-    
-    if (searchTerm) {
-      results = results.filter(person => 
-        person.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    
-    if (professionFilter) {
-      results = results.filter(person => 
-        person.profession === professionFilter
-      );
-    }
-    
-    setFilteredPeople(results);
-  }, [searchTerm, professionFilter, people]);
-  
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
-  };
-  
-  const handleProfessionChange = (e) => {
-    setProfessionFilter(e.target.value);
-  };
-  
-  const handleClearFilters = () => {
-    setSearchTerm('');
-    setProfessionFilter('');
-  };
-  
-  const handleRetry = async () => {
+    filterAndSortPeople();
+  }, [searchTerm, categoryFilter, sortBy, people]);
+
+  const fetchPeople = async () => {
     try {
       setLoading(true);
-      setError(null);
       const data = await personService.getPeople();
       setPeople(data);
-      setFilteredPeople(data);
       
-      // Extract unique professions for filter
-      const professions = [...new Set(data.map(person => person.profession).filter(Boolean))];
-      setAvailableProfessions(professions);
+      // Extract unique categories
+      const categories = [...new Set(data.map(person => person.category).filter(Boolean))];
+      setAvailableCategories(categories);
       
       setLoading(false);
     } catch (err) {
@@ -91,78 +44,277 @@ const PeopleListPage = () => {
       setLoading(false);
     }
   };
+
+  const loadFollowedPeople = () => {
+    // Load from localStorage (in a real app, this would be from your backend)
+    const followed = localStorage.getItem('followedPeople');
+    if (followed) {
+      setFollowedPeople(new Set(JSON.parse(followed)));
+    }
+  };
+
+  const handleFollow = (person) => {
+    const newFollowed = new Set(followedPeople);
+    if (newFollowed.has(person.id)) {
+      newFollowed.delete(person.id);
+    } else {
+      newFollowed.add(person.id);
+    }
+    setFollowedPeople(newFollowed);
+    localStorage.setItem('followedPeople', JSON.stringify([...newFollowed]));
+  };
+
+  const filterAndSortPeople = () => {
+    let results = people;
+    
+    // Apply search filter
+    if (searchTerm) {
+      results = results.filter(person => 
+        person.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (person.profession && person.profession.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+    }
+    
+    // Apply category filter
+    if (categoryFilter) {
+      results = results.filter(person => person.category === categoryFilter);
+    }
+    
+    // Apply sorting
+    results.sort((a, b) => {
+      switch (sortBy) {
+        case 'newsCount':
+          return (b.newsCount || 0) - (a.newsCount || 0);
+        case 'viewCount':
+          return (b.viewCount || 0) - (a.viewCount || 0);
+        case 'recent':
+          return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+        case 'name':
+        default:
+          return a.name.localeCompare(b.name);
+      }
+    });
+    
+    setFilteredPeople(results);
+  };
   
+  const handleRetry = () => {
+    fetchPeople();
+  };
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setCategoryFilter('');
+    setSortBy('name');
+  };
+
+  const stats = useMemo(() => {
+    const totalPeople = people.length;
+    const totalArticles = people.reduce((sum, person) => sum + (person.newsCount || 0), 0);
+    const activePeople = people.filter(person => (person.newsCount || 0) > 0).length;
+    
+    return { totalPeople, totalArticles, activePeople };
+  }, [people]);
+
+  const getCategoryColor = (category) => {
+    const colors = {
+      politician: 'bg-red-100 text-red-800',
+      celebrity: 'bg-purple-100 text-purple-800',
+      athlete: 'bg-green-100 text-green-800',
+      business: 'bg-blue-100 text-blue-800',
+      activist: 'bg-orange-100 text-orange-800',
+      journalist: 'bg-gray-100 text-gray-800',
+      scientist: 'bg-indigo-100 text-indigo-800',
+      artist: 'bg-pink-100 text-pink-800',
+      other: 'bg-gray-100 text-gray-800'
+    };
+    return colors[category] || colors.other;
+  };
+
   return (
     <>
       <Helmet>
         <title>People & Celebrities | Breaking News</title>
-        <meta name="description" content="Browse all people and celebrities featured in our news articles." />
+        <meta name="description" content="Browse all people and celebrities featured in our news articles. Follow your favorites and stay updated." />
       </Helmet>
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 font-montserrat">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">People & Celebrities</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+              People & Celebrities
+            </h1>
             <p className="text-gray-600 dark:text-gray-300">
-              Browse all the people featured in our news articles
+              Discover and follow the people making headlines
             </p>
           </div>
           
-          <Link 
-            to="/"
-            className="mt-4 md:mt-0 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors"
-          >
-            Back to News
-          </Link>
+          <div className="mt-4 lg:mt-0 flex items-center space-x-4">
+            <Link 
+              to="/"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors"
+            >
+              Back to News
+            </Link>
+          </div>
+        </div>
+
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-200">
+            <div className="flex items-center">
+              <div className="p-3 rounded-lg bg-blue-100 text-blue-600">
+                <FiUsers size={24} />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Total People</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalPeople}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-200">
+            <div className="flex items-center">
+              <div className="p-3 rounded-lg bg-green-100 text-green-600">
+                <FiTrendingUp size={24} />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Active in News</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.activePeople}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-200">
+            <div className="flex items-center">
+              <div className="p-3 rounded-lg bg-purple-100 text-purple-600">
+                <FiEye size={24} />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Total Articles</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalArticles}</p>
+              </div>
+            </div>
+          </div>
         </div>
         
-        {/* Search and Filter */}
+        {/* Filters and Controls */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Search */}
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FiSearch className="text-gray-400" />
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between space-y-4 lg:space-y-0">
+            {/* Search and Filters */}
+            <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 flex-1">
+              {/* Search */}
+              <div className="relative flex-1 max-w-md">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <FiSearch className="text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search by name or profession..."
+                  className="pl-10 pr-4 py-2 w-full border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                />
               </div>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={handleSearchChange}
-                placeholder="Search by name..."
-                className="pl-10 pr-4 py-2 w-full border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              />
-            </div>
-            
-            {/* Profession filter */}
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FiFilter className="text-gray-400" />
+              
+              {/* Category filter */}
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <FiFilter className="text-gray-400" />
+                </div>
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="pl-10 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white appearance-none"
+                >
+                  <option value="">All Categories</option>
+                  {availableCategories.map((category, index) => (
+                    <option key={index} value={category}>
+                      {category.charAt(0).toUpperCase() + category.slice(1)}
+                    </option>
+                  ))}
+                </select>
               </div>
+              
+              {/* Sort */}
               <select
-                value={professionFilter}
-                onChange={handleProfessionChange}
-                className="pl-10 pr-4 py-2 w-full border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
               >
-                <option value="">All Professions</option>
-                {availableProfessions.map((profession, index) => (
-                  <option key={index} value={profession}>{profession}</option>
-                ))}
+                <option value="name">Sort by Name</option>
+                <option value="newsCount">Most Mentioned</option>
+                <option value="viewCount">Most Viewed</option>
+                <option value="recent">Recently Added</option>
               </select>
             </div>
             
-            {/* Clear filters button */}
-            <button
-              onClick={handleClearFilters}
-              disabled={!searchTerm && !professionFilter}
-              className={`px-4 py-2 rounded-md ${
-                !searchTerm && !professionFilter
-                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                  : 'bg-red-100 text-red-600 hover:bg-red-200'
-              }`}
-            >
-              Clear Filters
-            </button>
+            {/* View Controls */}
+            <div className="flex items-center space-x-4">
+              {/* Clear filters */}
+              {(searchTerm || categoryFilter || sortBy !== 'name') && (
+                <button
+                  onClick={clearFilters}
+                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                >
+                  Clear Filters
+                </button>
+              )}
+              
+              {/* View mode toggle */}
+              <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-md p-1">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded ${
+                    viewMode === 'grid'
+                      ? 'bg-white dark:bg-gray-600 text-blue-600 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300'
+                  }`}
+                >
+                  <FiGrid size={18} />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded ${
+                    viewMode === 'list'
+                      ? 'bg-white dark:bg-gray-600 text-blue-600 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300'
+                  }`}
+                >
+                  <FiList size={18} />
+                </button>
+              </div>
+            </div>
           </div>
+          
+          {/* Active filters display */}
+          {(searchTerm || categoryFilter) && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {searchTerm && (
+                <span className="inline-flex items-center bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
+                  Search: "{searchTerm}"
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="ml-2 text-blue-600 hover:text-blue-800"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+              {categoryFilter && (
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${getCategoryColor(categoryFilter)}`}>
+                  {categoryFilter.charAt(0).toUpperCase() + categoryFilter.slice(1)}
+                  <button
+                    onClick={() => setCategoryFilter('')}
+                    className="ml-2 hover:opacity-70"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+            </div>
+          )}
         </div>
         
         {/* Error state */}
@@ -192,25 +344,69 @@ const PeopleListPage = () => {
           </div>
         ) : (
           <>
-            {/* Results count */}
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
-              {filteredPeople.length} {filteredPeople.length === 1 ? 'person' : 'people'} found
-              {(searchTerm || professionFilter) && ' matching your filters'}
-            </p>
+            {/* Results info */}
+            <div className="flex justify-between items-center mb-6">
+              <p className="text-gray-600 dark:text-gray-300">
+                {filteredPeople.length} {filteredPeople.length === 1 ? 'person' : 'people'} found
+                {(searchTerm || categoryFilter) && ' matching your filters'}
+              </p>
+              
+              {followedPeople.size > 0 && (
+                <p className="text-sm text-blue-600">
+                  Following {followedPeople.size} {followedPeople.size === 1 ? 'person' : 'people'}
+                </p>
+              )}
+            </div>
             
-            {/* People grid */}
+            {/* People display */}
             {filteredPeople.length === 0 ? (
-              <div className="bg-gray-100 dark:bg-gray-700 p-8 rounded-lg text-center">
-                <p className="text-gray-600 dark:text-gray-300">No people found matching your search criteria.</p>
+              <div className="bg-gray-100 dark:bg-gray-700 p-12 rounded-lg text-center">
+                <FiUsers className="mx-auto text-gray-300 text-5xl mb-4" />
+                <p className="text-gray-600 dark:text-gray-300 text-lg mb-2">
+                  No people found matching your search criteria.
+                </p>
+                <p className="text-gray-500 text-sm">
+                  Try adjusting your filters or search terms.
+                </p>
+              </div>
+            ) : viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                {filteredPeople.map(person => (
+                  <EnhancedPersonCard
+                    key={person.id}
+                    person={person}
+                    showStats={true}
+                    showActions={true}
+                    onFollow={handleFollow}
+                    isFollowing={followedPeople.has(person.id)}
+                  />
+                ))}
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+              <div className="space-y-4">
                 {filteredPeople.map(person => (
-                  <PersonCard key={person.id} person={person} />
+                  <EnhancedPersonCard
+                    key={person.id}
+                    person={person}
+                    variant="compact"
+                    showStats={true}
+                  />
                 ))}
               </div>
             )}
           </>
+        )}
+        
+        {/* Back to top button */}
+        {filteredPeople.length > 20 && (
+          <div className="mt-12 text-center">
+            <button
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-md transition-colors"
+            >
+              Back to Top
+            </button>
+          </div>
         )}
       </div>
     </>

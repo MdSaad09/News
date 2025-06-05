@@ -1,14 +1,15 @@
+// src/pages/admin/AdminHome.jsx - Updated with Advertisement section
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { 
   FiUsers, FiFileText, FiUserCheck, FiAlertTriangle, 
-  FiEye, FiTag, FiRefreshCw, FiActivity, FiTrendingUp , FiUser, FiVideo
+  FiEye, FiTag, FiRefreshCw, FiActivity, FiTrendingUp, 
+  FiUser, FiVideo, FiTarget, FiBarChart2  // Added FiTarget for advertisements
 } from 'react-icons/fi';
 import adminService from '../../services/adminService';
 
-
-// Extracted StatCard component for reusability
+// [Previous StatCard and ActivityItem components remain the same...]
 const StatCard = ({ icon, title, value, bgColor, textColor, linkTo, trend }) => (
   <Link 
     to={linkTo} 
@@ -37,19 +38,17 @@ const StatCard = ({ icon, title, value, bgColor, textColor, linkTo, trend }) => 
   </Link>
 );
 
-// Activity item component
 const ActivityItem = ({ activity }) => {
-  // Get border color based on activity type
   const getBorderColor = (type) => {
     switch (type) {
       case 'article': return 'border-blue-500';
       case 'application': return 'green-500';
       case 'registration': return 'border-orange-500';
+      case 'advertisement': return 'border-purple-500'; // New activity type
       default: return 'border-gray-500';
     }
   };
 
-  // Format timestamp to relative time
   const formatRelativeTime = (timestamp) => {
     const now = new Date();
     const date = new Date(timestamp);
@@ -69,7 +68,6 @@ const ActivityItem = ({ activity }) => {
     return date.toLocaleDateString();
   };
 
-  // Get activity message based on type
   const getMessage = () => {
     switch (activity.type) {
       case 'article':
@@ -88,6 +86,12 @@ const ActivityItem = ({ activity }) => {
         return (
           <p className="text-gray-800">
             New user registered: <span className="font-medium">{activity.user}</span>
+          </p>
+        );
+      case 'advertisement':
+        return (
+          <p className="text-gray-800">
+            New advertisement <span className="font-medium">{activity.title}</span> created
           </p>
         );
       default:
@@ -118,6 +122,14 @@ const ActivityItem = ({ activity }) => {
             Review
           </Link>
         )}
+        {activity.type === 'advertisement' && (
+          <Link 
+            to={`/admin/advertisements/edit/${activity.id}`}
+            className="text-blue-600 hover:text-blue-800 text-sm ml-2"
+          >
+            Edit
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -131,11 +143,16 @@ const AdminHome = () => {
     pendingArticles: 0,
     pendingApplications: 0,
     recentViews: 0,
+    totalPeople: 0,
+    videoNews: 0,
+    totalAdvertisements: 0, // New stat
+    activeAdvertisements: 0, // New stat
     recentActivity: [],
     trends: {
       users: 0,
       articles: 5,
-      views: 12
+      views: 12,
+      advertisements: 0 // New trend
     }
   });
   const [loading, setLoading] = useState(true);
@@ -160,7 +177,6 @@ const AdminHome = () => {
   useEffect(() => {
     fetchStats();
     
-    // Set up polling every 5 minutes
     const interval = setInterval(() => {
       fetchStats();
     }, 5 * 60 * 1000);
@@ -213,7 +229,7 @@ const AdminHome = () => {
         </div>
       )}
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
         <StatCard 
           icon={<FiUsers size={24} />}
           title="Total Users"
@@ -271,23 +287,43 @@ const AdminHome = () => {
           trend={stats.trends?.views}
         />
 
-<StatCard 
-  icon={<FiUser size={24} />}
-  title="Featured People"
-  value={stats.totalPeople || 0}
-  bgColor="bg-teal-600"
-  textColor="text-teal-600"
-  linkTo="/admin/people"
-/>
+        <StatCard 
+          icon={<FiUser size={24} />}
+          title="Featured People"
+          value={stats.totalPeople || 0}
+          bgColor="bg-teal-600"
+          textColor="text-teal-600"
+          linkTo="/admin/people"
+        />
 
-<StatCard 
-  icon={<FiVideo size={24} />}
-  title="Video News"
-  value={stats.videoNews || 0}
-  bgColor="bg-red-600"
-  textColor="text-red-600"
-  linkTo="/admin/news?video=true"
-/>
+        <StatCard 
+          icon={<FiVideo size={24} />}
+          title="Video News"
+          value={stats.videoNews || 0}
+          bgColor="bg-red-600"
+          textColor="text-red-600"
+          linkTo="/admin/news?video=true"
+        />
+
+        {/* New Advertisement Stats */}
+        <StatCard 
+          icon={<FiTarget size={24} />}
+          title="Total Advertisements"
+          value={stats.totalAdvertisements || 0}
+          bgColor="bg-pink-600"
+          textColor="text-pink-600"
+          linkTo="/admin/advertisements"
+          trend={stats.trends?.advertisements}
+        />
+
+        <StatCard 
+          icon={<FiTarget size={24} />}
+          title="Active Advertisements"
+          value={stats.activeAdvertisements || 0}
+          bgColor="bg-emerald-600"
+          textColor="text-emerald-600"
+          linkTo="/admin/advertisements?status=active"
+        />
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -298,65 +334,98 @@ const AdminHome = () => {
             Quick Actions
           </h3>
           <div className="grid grid-cols-2 gap-4">
-  <Link 
-    to="/admin/news/create" 
-    className="bg-blue-100 text-blue-700 p-4 rounded-lg hover:bg-blue-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-    aria-label="Create new article"
-  >
-    <FiFileText className="mb-2" size={24} aria-hidden="true" />
-    <span>Create Article</span>
-  </Link>
-  
-  <Link 
-    to="/admin/users/create" 
-    className="bg-green-100 text-green-700 p-4 rounded-lg hover:bg-green-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-green-500"
-    aria-label="Add new user"
-  >
-    <FiUsers className="mb-2" size={24} aria-hidden="true" />
-    <span>Add User</span>
-  </Link>
-  
-  <Link 
-    to="/admin/categories/create" 
-    className="bg-purple-100 text-purple-700 p-4 rounded-lg hover:bg-purple-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500"
-    aria-label="Add new category"
-  >
-    <FiTag className="mb-2" size={24} aria-hidden="true" />
-    <span>Add Category</span>
-  </Link>
-  
-  <Link 
-    to="/admin/people/create" 
-    className="bg-indigo-100 text-indigo-700 p-4 rounded-lg hover:bg-indigo-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-indigo-500"
-    aria-label="Add new person"
-  >
-    <FiUser className="mb-2" size={24} aria-hidden="true" />
-    <span>Add Person</span>
-  </Link>
-  
-  <Link 
-    to="/admin/applications" 
-    className="bg-orange-100 text-orange-700 p-4 rounded-lg hover:bg-orange-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-orange-500"
-    aria-label="Review reporter applications"
-  >
-    <FiAlertTriangle className="mb-2" size={24} aria-hidden="true" />
-    <span>Review Applications</span>
-    {stats.pendingApplications > 0 && (
-      <span className="mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-500 text-white">
-        {stats.pendingApplications}
-      </span>
-    )}
-  </Link>
-  
-  <Link 
-    to="/videos" 
-    className="bg-red-100 text-red-700 p-4 rounded-lg hover:bg-red-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-red-500"
-    aria-label="Browse video news"
-  >
-    <FiVideo className="mb-2" size={24} aria-hidden="true" />
-    <span>Video News</span>
-  </Link>
-</div>
+            <Link 
+              to="/admin/news/create" 
+              className="bg-blue-100 text-blue-700 p-4 rounded-lg hover:bg-blue-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-label="Create new article"
+            >
+              <FiFileText className="mb-2" size={24} aria-hidden="true" />
+              <span>Create Article</span>
+            </Link>
+            
+            <Link 
+              to="/admin/users/create" 
+              className="bg-green-100 text-green-700 p-4 rounded-lg hover:bg-green-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-green-500"
+              aria-label="Add new user"
+            >
+              <FiUsers className="mb-2" size={24} aria-hidden="true" />
+              <span>Add User</span>
+            </Link>
+            
+            <Link 
+              to="/admin/categories/create" 
+              className="bg-purple-100 text-purple-700 p-4 rounded-lg hover:bg-purple-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+              aria-label="Add new category"
+            >
+              <FiTag className="mb-2" size={24} aria-hidden="true" />
+              <span>Add Category</span>
+            </Link>
+            
+            <Link 
+              to="/admin/people/create" 
+              className="bg-indigo-100 text-indigo-700 p-4 rounded-lg hover:bg-indigo-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              aria-label="Add new person"
+            >
+              <FiUser className="mb-2" size={24} aria-hidden="true" />
+              <span>Add Person</span>
+            </Link>
+
+            <Link 
+  to="/admin/people/analytics" 
+  className="bg-violet-100 text-violet-700 p-4 rounded-lg hover:bg-violet-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-violet-500"
+  aria-label="View people analytics"
+>
+  <FiBarChart2 className="mb-2" size={24} aria-hidden="true" />
+  <span>People Analytics</span>
+</Link>
+            
+            <Link 
+              to="/admin/applications" 
+              className="bg-orange-100 text-orange-700 p-4 rounded-lg hover:bg-orange-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-orange-500"
+              aria-label="Review reporter applications"
+            >
+              <FiAlertTriangle className="mb-2" size={24} aria-hidden="true" />
+              <span>Review Applications</span>
+              {stats.pendingApplications > 0 && (
+                <span className="mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-500 text-white">
+                  {stats.pendingApplications}
+                </span>
+              )}
+            </Link>
+            
+            <Link 
+              to="/videos" 
+              className="bg-red-100 text-red-700 p-4 rounded-lg hover:bg-red-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-red-500"
+              aria-label="Browse video news"
+            >
+              <FiVideo className="mb-2" size={24} aria-hidden="true" />
+              <span>Video News</span>
+            </Link>
+
+            {/* New Advertisement Quick Actions */}
+            <Link 
+              to="/admin/advertisements/create" 
+              className="bg-pink-100 text-pink-700 p-4 rounded-lg hover:bg-pink-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-pink-500"
+              aria-label="Create new advertisement"
+            >
+              <FiTarget className="mb-2" size={24} aria-hidden="true" />
+              <span>Create Ad</span>
+            </Link>
+            
+            <Link 
+              to="/admin/advertisements" 
+              className="bg-emerald-100 text-emerald-700 p-4 rounded-lg hover:bg-emerald-200 transition-colors flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              aria-label="Manage advertisements"
+            >
+              <FiTarget className="mb-2" size={24} aria-hidden="true" />
+              <span>Manage Ads</span>
+              {stats.totalAdvertisements > 0 && (
+                <span className="mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500 text-white">
+                  {stats.totalAdvertisements}
+                </span>
+              )}
+            </Link>
+          </div>
         </div>
         
         {/* Recent Activity Card */}
@@ -401,7 +470,7 @@ const AdminHome = () => {
       </div>
       
       {/* Add custom CSS for scrollbar */}
-      <style jsx>{`
+      <style jsx='true'>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;
         }

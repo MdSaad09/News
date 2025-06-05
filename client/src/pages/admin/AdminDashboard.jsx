@@ -4,7 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { 
   FiHome, FiUsers, FiFileText, FiSettings, FiTag, 
   FiGrid, FiUserCheck, FiAlertTriangle, FiBarChart2,
-  FiLogOut, FiUser, FiChevronDown, FiChevronRight, FiClock , 
+  FiLogOut, FiUser, FiChevronDown, FiChevronRight, FiClock, FiTarget 
 } from 'react-icons/fi';
 import { logout } from '../../redux/thunks/authThunk';
 
@@ -17,10 +17,14 @@ import NewsManagement from './NewsManagement';
 import CategoryManagement from './CategoryManagement';
 import SiteSettings from './SiteSettings';
 import PageManagement from './PageManagement';
-import PeopleManagement from './PeopleManagement'; // New import
-import PersonEditor from './PersonEditor'; // New import  
-
-
+import PeopleManagement from './PeopleManagement';
+// Add this line after line 14 (after PersonEditor import)
+import PeopleAnalytics from './PeopleAnalytics';
+import PersonEditor from './PersonEditor';
+// Advertisement management imports
+import AdvertisementManagement from './AdvertisementManagement';
+import AdvertisementEditor from './AdvertisementEditor';
+import AdvertisementAnalytics from './AdvertisementAnalytics';
 
 // SidebarItem Component
 const SidebarItem = ({ path, icon, label, isActive, onClick }) => (
@@ -70,9 +74,12 @@ const AdminDashboard = () => {
     { path: '/admin/applications', icon: <FiAlertTriangle size={20} />, label: 'Reporter Applications' },
     { path: '/admin/news', icon: <FiFileText size={20} />, label: 'News Management' },
     { path: '/admin/categories', icon: <FiTag size={20} />, label: 'Categories' },
-    { path: '/admin/people', icon: <FiUser size={20} />, label: 'People Management' }, // New item
+    { path: '/admin/people', icon: <FiUser size={20} />, label: 'People Management' },
+    { path: '/admin/advertisements', icon: <FiTarget size={20} />, label: 'Advertisement Management' }, // New item
     { path: '/admin/pages', icon: <FiGrid size={20} />, label: 'Page Management' },
     { path: '/admin/settings', icon: <FiSettings size={20} />, label: 'Site Settings' },
+      { path: '/admin/people/analytics', icon: <FiBarChart2 size={20} />, label: 'People Analytics' },
+
   ];
   
   // Handle session timeout
@@ -303,14 +310,14 @@ const AdminDashboard = () => {
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 ring-1 ring-black ring-opacity-5">
                   <Link 
                     to="/profile" 
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 items-center"
                   >
                     <FiUser className="mr-2" />
                     Your Profile
                   </Link>
                   <button 
                     onClick={handleLogout}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 items-center"
                   >
                     <FiLogOut className="mr-2" />
                     Sign out
@@ -338,6 +345,12 @@ const AdminDashboard = () => {
               <Route path="pages/*" element={<PageManagement />} />
               <Route path="settings/*" element={<SiteSettings />} />
               <Route path="people/*" element={<PeopleManagement />} />
+               <Route path="people/analytics" element={<PeopleAnalytics />} />
+              {/* Advertisement Management Routes */}
+              <Route path="advertisements" element={<AdvertisementManagement />} />
+              <Route path="advertisements/create" element={<AdvertisementEditor />} />
+              <Route path="advertisements/edit/:id" element={<AdvertisementEditor />} />
+              <Route path="advertisements/analytics/:id" element={<AdvertisementAnalytics />} />
             </Routes>
           )}
         </div>

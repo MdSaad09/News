@@ -1,7 +1,7 @@
 // src/pages/admin/PeopleManagement.jsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FiPlus, FiEdit2, FiTrash2, FiRefreshCw, FiSearch } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiRefreshCw, FiSearch, FiTrendingUp } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import personService from '../../services/personService';
 
@@ -74,17 +74,25 @@ const PeopleManagement = () => {
   
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">People Management</h1>
-        <Link 
-          to="/admin/people/create" 
-          className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md flex items-center"
-        >
-          <FiPlus className="mr-2" />
-          Add New Person
-        </Link>
-      </div>
-      
+     <div className="flex justify-between items-center mb-6">
+  <h1 className="text-2xl font-bold">People Management</h1>
+  <div className="flex items-center space-x-3">
+    <Link 
+      to="/admin/people/analytics" 
+      className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md flex items-center transition-colors"
+    >
+      <FiTrendingUp className="mr-2" />
+      Analytics
+    </Link>
+    <Link 
+      to="/admin/people/create" 
+      className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md flex items-center"
+    >
+      <FiPlus className="mr-2" />
+      Add New Person
+    </Link>
+  </div>
+</div>
       {/* Search bar */}
       <div className="mb-6">
         <div className="relative max-w-md">
