@@ -4,7 +4,7 @@ NewsHub is a cutting-edge news platform that redefines how you stay informed. Bu
 
 ## 🌟 Why Choose NewsHub?
 
-- ** Feeds ** 🤖: News tailored to your interests.
+- **Feeds** 🤖: News tailored to your interests.
 - **Lightning-Fast Updates** ⚡️: Stay ahead with live global news.
 - **Sleek UI** 🎨: Tailwind CSS for a responsive, modern design.
 - **Smooth State Management** 🔄: Redux for seamless interactions.
